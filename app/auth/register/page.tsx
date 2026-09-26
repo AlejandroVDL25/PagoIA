@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Spinner } from "@/components/ui/spinner"
 import { Mail, Lock, User, AlertCircle, CheckCircle } from "lucide-react"
 import { Logo } from "@/components/brand/logo"
+import { authErrorMessage } from "@/lib/auth-errors"
 
 export default function RegisterPage() {
   const [name, setName] = useState("")
@@ -62,7 +63,7 @@ export default function RegisterPage() {
       })
 
       if (error) {
-        setError(error.message)
+        setError(authErrorMessage(error.message))
         return
       }
 
@@ -95,7 +96,7 @@ export default function RegisterPage() {
       })
 
       if (error) {
-        setError(error.message)
+        setError(authErrorMessage(error.message))
         setGoogleLoading(false)
       }
     } catch {

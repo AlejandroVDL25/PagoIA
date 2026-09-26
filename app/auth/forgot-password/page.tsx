@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Mail, AlertCircle, CheckCircle, ArrowLeft } from "lucide-react"
 import { Logo } from "@/components/brand/logo"
+import { authErrorMessage } from "@/lib/auth-errors"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -29,7 +30,7 @@ export default function ForgotPasswordPage() {
       })
 
       if (error) {
-        setError(error.message)
+        setError(authErrorMessage(error.message))
         return
       }
 

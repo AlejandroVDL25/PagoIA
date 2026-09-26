@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Lock, AlertCircle, CheckCircle } from "lucide-react"
 import { Logo } from "@/components/brand/logo"
+import { authErrorMessage } from "@/lib/auth-errors"
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("")
@@ -41,7 +42,7 @@ export default function ResetPasswordPage() {
     setLoading(true)
     try {
       const { error } = await supabase.auth.updateUser({ password })
-      if (error) { setError(error.message); return }
+      if (error) { setError(authErrorMessage(error.message)); return }
       setDone(true)
       setTimeout(() => router.push("/auth/login"), 3000)
     } catch {

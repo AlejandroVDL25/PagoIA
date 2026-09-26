@@ -13,14 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Spinner } from "@/components/ui/spinner"
 import { Mail, Lock, AlertCircle } from "lucide-react"
 import { Logo } from "@/components/brand/logo"
-
-/** Traduce los errores más comunes de Supabase Auth. */
-function authErrorMessage(message: string) {
-  if (/invalid login credentials/i.test(message)) return "Correo o contraseña incorrectos. Si no recuerdas tu contraseña, usa “¿Olvidaste tu contraseña?”."
-  if (/email not confirmed/i.test(message)) return "Confirma tu correo antes de iniciar sesión; revisa tu bandeja de entrada."
-  if (/rate limit|too many/i.test(message)) return "Demasiados intentos. Espera unos minutos y vuelve a intentarlo."
-  return message
-}
+import { authErrorMessage } from "@/lib/auth-errors"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
