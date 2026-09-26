@@ -17,3 +17,7 @@ node_modules
 # Respaldos de scripts de limpieza (contienen datos de usuarios)
 scripts/respaldos/
 video/explicativo/frames/
+
+.vercel
+.env*
+!.env.example
