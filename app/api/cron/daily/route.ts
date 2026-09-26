@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { createAlertAndPush } from "@/lib/notifications/push"
 import { sendEmail } from "@/lib/notifications/email"
 import { normalizeMxPhone, sendWhatsAppTemplate } from "@/lib/notifications/whatsapp"
+import { resolveLocale, translate, whatsappLanguage, type Locale } from "@/lib/i18n"
 import { computeUserForecasts } from "@/lib/forecast-service"
 import { MODEL_VERSION } from "@/lib/forecast"
 import { daysUntil, nextDueDate, parseDueDay, toISODate } from "@/lib/due-dates"
@@ -138,11 +139,15 @@ export async function GET(req: NextRequest) {
       // 4. Recordatorios de vencimiento.
       const { data: reminders } = await admin.from("reminders").select("id, user_service_id, channel, days_before, last_sent_at").eq("user_id", userId)
       if (reminders?.length) {
-        let contact: { email: string | null; phone: string | null } | undefined
+        let contact: { email: string | null; phone: string | null; locale: Locale } | undefined
         const getContact = async () => {
           if (!contact) {
             const authUser = (await admin.auth.admin.getUserById(userId)).data.user
-            contact = { email: authUser?.email ?? null, phone: normalizeMxPhone(authUser?.user_metadata?.phone) }
+            contact = {
+              email: authUser?.email ?? null,
+              phone: normalizeMxPhone(authUser?.user_metadata?.phone),
+              locale: resolveLocale(authUser?.user_metadata?.locale),
+            }
           }
           return contact
         }
@@ -166,17 +171,20 @@ export async function GET(req: NextRequest) {
             await createAlertAndPush({ userId, supabaseClient: admin, alertType: "info", title, message: body, url: "/dashboard/servicios" })
             sent = true
           } else if (r.channel === "whatsapp") {
-            const { phone } = await getContact()
+            const { phone, locale } = await getContact()
             if (phone) {
               sent = await sendWhatsAppTemplate({
                 to: phone,
-                params: [label(service.service_type), `${when} (${dueLabel})`, service.last_amount ? money(Number(service.last_amount)) : "por confirmar"],
+                language: whatsappLanguage(locale),
+                params: [label(service.service_type), `${when} (${dueLabel})`, service.last_amount ? money(Number(service.last_amount)) : "por confirmar"].map(
+                  (p) => translate(p, locale),
+                ),
               })
             }
             if (sent) stats.whatsapp++
           } else {
-            const { email } = await getContact()
-            if (email) sent = await sendEmail({ to: email, subject: title, text: `${body}\n\nPaga desde PagoIA: ${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard/servicios` })
+            const { email, locale } = await getContact()
+            if (email) sent = await sendEmail({ to: email, subject: translate(title, locale), text: translate(`${body}\n\nPaga desde PagoIA: ${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard/servicios`, locale) })
             if (sent) stats.emails++
           }
           if (sent) {

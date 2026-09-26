@@ -11,8 +11,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Mail, AlertCircle, CheckCircle, ArrowLeft } from "lucide-react"
 import { Logo } from "@/components/brand/logo"
 import { authErrorMessage } from "@/lib/auth-errors"
+import { useLocale } from "@/components/i18n/locale-provider"
+import { LanguageSelect } from "@/components/i18n/language-select"
 
 export default function ForgotPasswordPage() {
+  const { t } = useLocale()
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -88,7 +91,7 @@ export default function ForgotPasswordPage() {
           {error && (
             <Alert variant="destructive" className="bg-destructive/10 border-destructive/50">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{t(error)}</AlertDescription>
             </Alert>
           )}
 
@@ -125,6 +128,9 @@ export default function ForgotPasswordPage() {
             <ArrowLeft className="w-4 h-4" />
             Volver a Iniciar Sesión
           </Link>
+          <div className="flex justify-center pt-2">
+            <LanguageSelect compact />
+          </div>
         </CardContent>
       </Card>
     </div>

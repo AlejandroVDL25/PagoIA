@@ -54,6 +54,11 @@ async function addUsage(userId: string, input: number, output: number) {
   }
 }
 
+/** Indica al widget si el asistente con Claude está disponible; si no, usa el chatbot por palabras clave sin fallar. */
+export async function GET() {
+  return NextResponse.json({ enabled: Boolean(process.env.ANTHROPIC_API_KEY) })
+}
+
 export async function POST(req: NextRequest) {
   // Sin llave el widget usa el chatbot por palabras clave (/api/ai-support).
   if (!process.env.ANTHROPIC_API_KEY) {

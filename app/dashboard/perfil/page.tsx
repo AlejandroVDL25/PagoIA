@@ -62,7 +62,7 @@ export default function PerfilPage() {
       setFormData({
         fullName: user.user_metadata?.full_name || "",
         phone: user.user_metadata?.phone || "",
-        country: user.user_metadata?.country || "Perú",
+        country: "México",
       })
       
       // Cargar estadísticas
@@ -114,7 +114,7 @@ export default function PerfilPage() {
         data: {
           full_name: formData.fullName,
           phone: formData.phone,
-          country: formData.country,
+          country: "México",
         },
       })
 
@@ -324,13 +324,13 @@ export default function PerfilPage() {
                 <MapPin className="w-4 h-4" />
                 País
               </label>
-              <Input 
-                disabled={!editing}
-                placeholder="Seleccionar país"
-                value={formData.country}
-                onChange={(e) => setFormData({...formData, country: e.target.value})}
+              <Input
+                disabled
+                value="México"
+                readOnly
                 className="bg-secondary border-border text-foreground"
               />
+              <p className="mt-1 text-xs text-muted-foreground">PagoIA funciona solo en México: pagos en pesos (MXN) y horario de la Ciudad de México.</p>
             </div>
           </div>
 
@@ -357,7 +357,7 @@ export default function PerfilPage() {
                   setFormData({
                     fullName: user?.user_metadata?.full_name || "",
                     phone: user?.user_metadata?.phone || "",
-                    country: user?.user_metadata?.country || "Perú",
+                    country: "México",
                   })
                 }}
                 className="border-border text-foreground hover:bg-secondary"

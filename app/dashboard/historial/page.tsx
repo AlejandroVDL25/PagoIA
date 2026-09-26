@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Download, Filter, Calendar } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { printHtml } from "@/lib/print-html"
 import { createClient } from "@/lib/supabase/client"
 
 interface DbTransaction {
@@ -262,11 +263,11 @@ export default function HistorialPage() {
         </head>
         <body>
           <h1>📊 Historial de Pagos - PagoIA</h1>
-          <p>Generado: ${new Date().toLocaleString()}</p>
+          <p>Generado: ${new Date().toLocaleString("es-MX", { timeZone: "America/Mexico_City" })}</p>
           
           <div class="summary">
             <strong>Total Transacciones:</strong> ${filteredTransactions.length}<br>
-            <strong>Monto Total:</strong> $${filteredTransactions.reduce((sum, t) => sum + t.amount, 0).toLocaleString()} MXN
+            <strong>Monto Total:</strong> $${filteredTransactions.reduce((sum, t) => sum + t.amount, 0).toLocaleString("es-MX")} MXN
           </div>
 
           <table>
@@ -286,7 +287,7 @@ export default function HistorialPage() {
                 <tr>
                   <td>${t.id}</td>
                   <td>${t.service}</td>
-                  <td>$${t.amount.toLocaleString()}</td>
+                  <td>$${t.amount.toLocaleString("es-MX")}</td>
                   <td>${t.date}</td>
                   <td>${statusLabel(t.status)}</td>
                   <td>${t.method}</td>
@@ -304,12 +305,7 @@ export default function HistorialPage() {
       </html>
     `
 
-    const printWindow = window.open('', '', 'width=800,height=600')
-    if (printWindow) {
-      printWindow.document.write(htmlContent)
-      printWindow.document.close()
-      printWindow.print()
-      
+    if (printHtml(htmlContent)) {
       toast({
         title: "✅ Abriendo PDF",
         description: "Usa la opción de Imprimir para guardar como PDF",
@@ -393,14 +389,14 @@ export default function HistorialPage() {
         <Card className="bg-gradient-to-br from-primary/10 to-cyan-500/10 border-primary/30">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Monto Total</p>
-            <p className="text-2xl font-bold text-primary">${totalAmount.toLocaleString()} MXN</p>
+            <p className="text-2xl font-bold text-primary">${totalAmount.toLocaleString("es-MX")} MXN</p>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/30">
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Promedio</p>
-            <p className="text-2xl font-bold text-blue-600">${filteredTransactions.length > 0 ? Math.round(totalAmount / filteredTransactions.length).toLocaleString() : 0} MXN</p>
+            <p className="text-2xl font-bold text-blue-600">${filteredTransactions.length > 0 ? Math.round(totalAmount / filteredTransactions.length).toLocaleString("es-MX") : 0} MXN</p>
           </CardContent>
         </Card>
       </div>
@@ -458,7 +454,7 @@ export default function HistorialPage() {
                   <tr key={t.id} className={`border-b border-border/50 ${idx % 2 === 0 ? 'bg-secondary/20' : ''} hover:bg-secondary/30 transition-colors`}>
                     <td className="py-3 px-4 text-foreground font-semibold">#{t.id.slice(0, 8)}</td>
                     <td className="py-3 px-4 text-foreground">{t.service}</td>
-                    <td className="py-3 px-4 text-right text-brand-spark font-bold">${t.amount.toLocaleString()}</td>
+                    <td className="py-3 px-4 text-right text-brand-spark font-bold">${t.amount.toLocaleString("es-MX")}</td>
                     <td className="py-3 px-4 text-foreground text-xs">{t.date}</td>
                     <td className="py-3 px-4">
                       <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border font-semibold ${statusBadgeClass(t.status)}`}>

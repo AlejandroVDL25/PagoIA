@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, Trash2, AlertTriangle, Info, CheckCircle2, Bell } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useLocale } from "@/components/i18n/locale-provider"
 
 interface Alert {
   id: string
@@ -21,6 +22,7 @@ interface Alert {
 type FilterType = "all" | "info" | "warning" | "error" | "success"
 
 export default function NotificacionesPage() {
+  const { t, locale } = useLocale()
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -107,6 +109,7 @@ export default function NotificacionesPage() {
   }
 
   const handleClearAll = async () => {
+    if (!window.confirm(t("¿Borrar todas las notificaciones? No se puede deshacer."))) return
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { error } = await supabase
@@ -186,9 +189,9 @@ export default function NotificacionesPage() {
       <div>
         <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
           <Bell className="w-8 h-8" />
-          Notificaciones
+          {t("Notificaciones")}
         </h1>
-        <p className="text-muted-foreground mt-2">Gestiona tus alertas y notificaciones</p>
+        <p className="text-muted-foreground mt-2">{t("Gestiona tus alertas y notificaciones")}</p>
       </div>
 
       {/* Stats and Actions */}
@@ -197,7 +200,7 @@ export default function NotificacionesPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Notificaciones sin leer</p>
+                <p className="text-sm text-muted-foreground">{t("Notificaciones sin leer")}</p>
                 <p className="text-3xl font-bold text-foreground mt-1">{unreadCount}</p>
               </div>
               <Badge variant="default" className="text-lg px-3 py-1">
@@ -209,7 +212,7 @@ export default function NotificacionesPage() {
 
         <Card className="bg-card border-border">
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total de notificaciones</p>
+            <p className="text-sm text-muted-foreground">{t("Total de notificaciones")}</p>
             <p className="text-3xl font-bold text-foreground mt-1">{alerts.length}</p>
           </CardContent>
         </Card>
@@ -222,7 +225,7 @@ export default function NotificacionesPage() {
           disabled={unreadCount === 0}
           className="bg-primary hover:bg-primary/90"
         >
-          Marcar todas como leídas
+          {t("Marcar todas como leídas")}
         </Button>
         <Button
           onClick={handleClearAll}
@@ -230,13 +233,13 @@ export default function NotificacionesPage() {
           variant="outline"
           className="border-destructive/30 text-destructive hover:bg-destructive/10"
         >
-          Limpiar todas
+          {t("Limpiar todas")}
         </Button>
       </div>
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
-        <span className="text-sm font-medium text-foreground self-center">Filtrar por tipo:</span>
+        <span className="text-sm font-medium text-foreground self-center">{t("Filtrar por tipo:")}</span>
         {[
           { label: "Todas", value: "all" as FilterType },
           { label: "Información", value: "info" as FilterType },
@@ -251,7 +254,7 @@ export default function NotificacionesPage() {
             className={filter === btn.value ? "bg-primary" : "border-border"}
             size="sm"
           >
-            {btn.label}
+            {t(btn.label)}
           </Button>
         ))}
       </div>
@@ -262,14 +265,14 @@ export default function NotificacionesPage() {
           <Card className="bg-card border-border">
             <CardContent className="pt-6 text-center">
               <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-foreground" />
-              <p className="text-muted-foreground">Cargando notificaciones...</p>
+              <p className="text-muted-foreground">{t("Cargando notificaciones...")}</p>
             </CardContent>
           </Card>
         ) : filteredAlerts.length === 0 ? (
           <Card className="bg-card border-border">
             <CardContent className="pt-6 text-center">
               <Bell className="w-12 h-12 text-muted-foreground/30 mx-auto mb-2" />
-              <p className="text-muted-foreground">No hay notificaciones en esta categoría</p>
+              <p className="text-muted-foreground">{t("No hay notificaciones en esta categoría")}</p>
             </CardContent>
           </Card>
         ) : (
@@ -291,14 +294,15 @@ export default function NotificacionesPage() {
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-foreground">{alert.title}</h3>
-                        {!alert.is_read && <Badge>Nuevo</Badge>}
+                        <h3 className="font-semibold text-foreground">{t(alert.title)}</h3>
+                        {!alert.is_read && <Badge>{t("Nuevo")}</Badge>}
                       </div>
                       <p className="text-sm text-muted-foreground mt-1 break-words">
-                        {alert.message}
+                        {t(alert.message)}
                       </p>
                       <p className="text-xs text-muted-foreground/60 mt-2">
-                        {new Date(alert.created_at).toLocaleDateString("es-MX", {
+                        {new Date(alert.created_at).toLocaleDateString(locale, {
+                          timeZone: "America/Mexico_City",
                           year: "numeric",
                           month: "short",
                           day: "numeric",
@@ -322,7 +326,7 @@ export default function NotificacionesPage() {
                         {markingRead === alert.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                          "Marcar leído"
+                          t("Marcar leído")
                         )}
                       </Button>
                     )}

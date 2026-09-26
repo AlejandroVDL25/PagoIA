@@ -104,7 +104,15 @@ FFMPEG_PATH="$(node -p 'require("ffmpeg-static")')" node scripts/render-video.mj
 
 Para ver la composición en tiempo real, abre `video/explicativo/index.html?play` en el navegador. Si quieres voz en off, graba la columna "Voz en off" del guion y únela al MP4 en cualquier editor; los tiempos coinciden.
 
-## 9. Cómo funciona cada parte
+## 9. Solo México e idiomas
+
+- **Solo México:** pesos (MXN), hora de la Ciudad de México en el servidor (`instrumentation.ts`), país fijo en el perfil y celulares +52.
+- **Idiomas de avisos:** español de México es el principal. Cada usuario puede elegir inglés (EE. UU.) o alemán en Configuración o en las pantallas de acceso; la elección se guarda en su cuenta (`user_metadata.locale`).
+- **Cómo se traduce:** los textos se escriben en español y `lib/i18n/catalog.ts` tiene su versión en inglés y alemán. Se traducen los avisos en pantalla, el centro de notificaciones, los errores de acceso, las notificaciones push, los correos y los WhatsApp. Un texto sin traducción se muestra en español.
+- **WhatsApp:** la plantilla `recordatorio_pago` debe estar aprobada también en inglés (`en_US`) y alemán (`de`) si alguien elige esos idiomas.
+- **Pruebas:** `__tests__/i18n.test.ts` revisa que cada mensaje que genera el servidor tenga traducción.
+
+## 10. Cómo funciona cada parte
 
 - **Asistente** (`app/api/ai/chat`, `lib/ai/assistant.ts`):
   - Usa `claude-opus-5` con streaming y cinco herramientas de solo lectura.
@@ -120,7 +128,7 @@ Para ver la composición en tiempo real, abre `video/explicativo/index.html?play
 - **Pagos automáticos** (`lib/autopay.ts`, `lib/payments/autopay-stripe.ts`): la decisión de qué cobrar es una función pura con pruebas. Los cargos se hacen con `off_session: true` sobre la tarjeta guardada.
 - **Hogar compartido** (`app/api/households`): la invitación es un código de 8 caracteres que vence en 7 días. Los montos se reparten en centavos, así que las partes siempre suman el total.
 
-## 10. Pendientes conocidos
+## 11. Pendientes conocidos
 
 - **Pagos reales:** PagoIA cobra con Stripe, pero no le paga a CFE ni a TELMEX. Mantén Stripe en modo de prueba y descríbelo como prototipo.
 - **Voz en off del video:** el MP4 no tiene audio; los subtítulos cubren el guion.

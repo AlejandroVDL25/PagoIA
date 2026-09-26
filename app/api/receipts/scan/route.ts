@@ -14,6 +14,11 @@ const typeFromPath = (path: string) => {
   return ext === "pdf" ? "application/pdf" : ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg"
 }
 
+/** Indica a la interfaz si el escaneo está disponible, para no subir archivos que no se podrán leer. */
+export async function GET() {
+  return NextResponse.json({ enabled: Boolean(process.env.ANTHROPIC_API_KEY) })
+}
+
 /** Recibe la ruta de un archivo ya subido a receipts/{uid}/ y devuelve los datos extraídos para revisión. */
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {

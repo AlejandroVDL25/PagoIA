@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { useLocale } from "@/components/i18n/locale-provider"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -83,6 +84,7 @@ const formatDate = (d: string | null) =>
 export function ReceiptScanner() {
   const supabase = useMemo(() => createClient(), [])
   const { toast } = useToast()
+  const { t } = useLocale()
   const fileInput = useRef<HTMLInputElement>(null)
   const cameraInput = useRef<HTMLInputElement>(null)
   const [consent, setConsent] = useState(false)
@@ -91,6 +93,14 @@ export function ReceiptScanner() {
   const [dudosos, setDudosos] = useState<string[]>([])
   const [form, setForm] = useState<Form | null>(null)
   const [history, setHistory] = useState<Receipt[]>([])
+  const [scanEnabled, setScanEnabled] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch("/api/receipts/scan")
+      .then((r) => (r.ok ? r.json() : { enabled: false }))
+      .then((d) => setScanEnabled(Boolean(d.enabled)))
+      .catch(() => setScanEnabled(false))
+  }, [])
 
   useEffect(() => {
     try {
@@ -116,7 +126,8 @@ export function ReceiptScanner() {
   }
 
   const handleFile = async (file: File | undefined) => {
-    if (!file) return
+    // Sin escaneo activo no se sube nada: el archivo quedaría guardado sin poder leerse.
+    if (!file || scanEnabled !== true) return
     if (!["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) {
       toast({ title: "Formato no compatible", description: "Sube una foto (JPG, PNG o WebP) o un PDF.", variant: "destructive" })
       return
@@ -258,11 +269,17 @@ export function ReceiptScanner() {
               </span>
             </label>
 
+            {scanEnabled === false && (
+              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300" role="status">
+                {t("El escaneo con IA todavía no está activado en este sitio. Mientras tanto, agrega tus recibos desde Mis Pagos.")}
+              </p>
+            )}
+
             <div className="grid gap-3 sm:grid-cols-2">
-              <Button size="lg" disabled={!consent || busy} onClick={() => cameraInput.current?.click()} className="h-14">
+              <Button size="lg" disabled={!consent || busy || scanEnabled !== true} onClick={() => cameraInput.current?.click()} className="h-14">
                 <Camera className="mr-2 h-5 w-5" /> Tomar foto
               </Button>
-              <Button size="lg" variant="outline" disabled={!consent || busy} onClick={() => fileInput.current?.click()} className="h-14">
+              <Button size="lg" variant="outline" disabled={!consent || busy || scanEnabled !== true} onClick={() => fileInput.current?.click()} className="h-14">
                 <FileUp className="mr-2 h-5 w-5" /> Subir foto o PDF
               </Button>
             </div>

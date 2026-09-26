@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { useLocale } from "@/components/i18n/locale-provider"
 import { serviceLabel, formatMXN } from "@/lib/services-meta"
 import { cn } from "@/lib/utils"
 
@@ -124,6 +125,7 @@ function ScheduleRow({ service, schedule, hasCard, onSaved }: { service: Service
 
 export function AutopayPanel() {
   const { toast } = useToast()
+  const { t } = useLocale()
   const router = useRouter()
   const params = useSearchParams()
   const [data, setData] = useState<Data | null>(null)
@@ -168,7 +170,7 @@ export function AutopayPanel() {
   }
 
   const removeCard = async () => {
-    if (!window.confirm("¿Quitar la tarjeta? Se pausarán todos tus pagos automáticos.")) return
+    if (!window.confirm(t("¿Quitar la tarjeta? Se pausarán todos tus pagos automáticos."))) return
     setBusy("remove")
     await fetch("/api/autopay/card", { method: "DELETE" })
     setBusy(null)

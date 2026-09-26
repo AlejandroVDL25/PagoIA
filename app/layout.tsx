@@ -5,6 +5,8 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { FloatingAIPaymentSupport } from '@/components/floating-ai-payment-support'
 import { PushNotificationsManager } from '@/components/push-notifications-manager'
+import { Toaster } from '@/components/ui/toaster'
+import { LocaleProvider } from '@/components/i18n/locale-provider'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
@@ -53,12 +55,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} ${bricolage.variable}`}>
+    <html lang="es-MX" suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} ${bricolage.variable}`}>
       <body className="font-sans antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
-          <PushNotificationsManager />
-          <FloatingAIPaymentSupport />
+          <LocaleProvider>
+            {children}
+            <Toaster />
+            <PushNotificationsManager />
+            <FloatingAIPaymentSupport />
+          </LocaleProvider>
           <Analytics />
           <SpeedInsights />
         </ThemeProvider>

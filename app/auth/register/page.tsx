@@ -14,8 +14,11 @@ import { Spinner } from "@/components/ui/spinner"
 import { Mail, Lock, User, AlertCircle, CheckCircle } from "lucide-react"
 import { Logo } from "@/components/brand/logo"
 import { authErrorMessage } from "@/lib/auth-errors"
+import { useLocale } from "@/components/i18n/locale-provider"
+import { LanguageSelect } from "@/components/i18n/language-select"
 
 export default function RegisterPage() {
+  const { t } = useLocale()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -151,7 +154,7 @@ export default function RegisterPage() {
             {error && (
               <Alert variant="destructive" className="bg-destructive/10 border-destructive/50">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
+                <AlertDescription>{t(error)}</AlertDescription>
               </Alert>
             )}
 
@@ -276,6 +279,9 @@ export default function RegisterPage() {
               Inicia Sesión
             </Link>
           </p>
+          <div className="flex justify-center pt-2">
+            <LanguageSelect compact />
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -34,7 +34,11 @@ export function maskPhone(e164: string) {
   return `+52 •••• ${e164.slice(-4)}`
 }
 
-export async function sendWhatsAppTemplate({ to, params }: { to: string; params: string[] }) {
+/**
+ * `language` es el código de idioma de la plantilla en Meta (es_MX, en_US o de). La plantilla debe
+ * estar aprobada en cada idioma que se use; ver whatsappLanguage() en lib/i18n.
+ */
+export async function sendWhatsAppTemplate({ to, params, language }: { to: string; params: string[]; language?: string }) {
   const token = process.env.WHATSAPP_TOKEN
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
   if (!token || !phoneNumberId) return false
@@ -48,7 +52,7 @@ export async function sendWhatsAppTemplate({ to, params }: { to: string; params:
       type: "template",
       template: {
         name: process.env.WHATSAPP_TEMPLATE || "recordatorio_pago",
-        language: { code: process.env.WHATSAPP_TEMPLATE_LANG || "es_MX" },
+        language: { code: language || process.env.WHATSAPP_TEMPLATE_LANG || "es_MX" },
         components: [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }],
       },
     }),

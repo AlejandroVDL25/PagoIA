@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge"
 import { Download, FileText, BarChart3, TrendingUp, TrendingDown, FileDown } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { printHtml } from "@/lib/print-html"
 
 const SERVICE_LABELS: Record<string, string> = {
   electricity: "Electricidad CFE", water: "Agua CONAGUA",
@@ -115,10 +116,7 @@ export default function EstadosCuentaPage() {
 <div class="footer">Generado por PagoIA · ${new Date().toLocaleDateString("es-MX")} · Comprobante digital</div>
 <script>window.onload=()=>window.print()</script>
 </body></html>`
-    const win = window.open("", "_blank")
-    if (win) {
-      win.document.write(htmlContent)
-      win.document.close()
+    if (printHtml(htmlContent)) {
       toast({ title: "📄 PDF generado", description: `Factura de ${invoice.service} lista para guardar` })
     }
   }
@@ -157,10 +155,7 @@ export default function EstadosCuentaPage() {
 <div class="footer">Generado por PagoIA · ${new Date().toLocaleDateString("es-MX")}</div>
 <script>window.onload=()=>window.print()</script>
 </body></html>`
-    const win = window.open("", "_blank")
-    if (win) {
-      win.document.write(htmlContent)
-      win.document.close()
+    if (printHtml(htmlContent)) {
       toast({ title: "📊 Informe PDF generado", description: `Reporte de ${report.period} listo para guardar` })
     }
   }

@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import webpush from "web-push"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { translate } from "@/lib/i18n"
+import { getUserLocale } from "@/lib/i18n/server"
 
 interface PushSubscriptionRecord {
   id: string
@@ -264,13 +266,16 @@ export async function createAlertAndPush({
     return { sent: 0, failed: 0, skipped: 1 }
   }
 
+  // La alerta se guarda en español de México (el centro de notificaciones la traduce al mostrarla);
+  // la notificación push sale ya en el idioma que eligió la persona.
+  const locale = await getUserLocale(userId)
   return sendPushToUser(
     userId,
     {
-    title,
-    body: message,
-    url,
-    tag,
+      title: translate(title, locale),
+      body: translate(message, locale),
+      url,
+      tag,
     },
     supabase
   )

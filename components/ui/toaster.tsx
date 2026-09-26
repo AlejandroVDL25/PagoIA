@@ -1,6 +1,7 @@
 'use client'
 
 import { useToast } from '@/hooks/use-toast'
+import { useLocale } from '@/components/i18n/locale-provider'
 import {
   Toast,
   ToastClose,
@@ -12,6 +13,8 @@ import {
 
 export function Toaster() {
   const { toasts } = useToast()
+  // Los avisos se escriben en español de México y se muestran en el idioma elegido.
+  const { t } = useLocale()
 
   return (
     <ToastProvider>
@@ -19,9 +22,9 @@ export function Toaster() {
         return (
           <Toast key={id} {...props}>
             <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
+              {title && <ToastTitle>{typeof title === 'string' ? t(title) : title}</ToastTitle>}
               {description && (
-                <ToastDescription>{description}</ToastDescription>
+                <ToastDescription>{typeof description === 'string' ? t(description) : description}</ToastDescription>
               )}
             </div>
             {action}

@@ -45,6 +45,14 @@ export function FloatingAIPaymentSupport() {
   const [isLoading, setIsLoading] = useState(false)
   const [statusLabel, setStatusLabel] = useState<string | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch("/api/ai/chat")
+      .then((r) => (r.ok ? r.json() : { enabled: false }))
+      .then((d) => setAiEnabled(Boolean(d.enabled)))
+      .catch(() => setAiEnabled(false))
+  }, [])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -100,6 +108,13 @@ export function FloatingAIPaymentSupport() {
         .filter((m) => m.id !== "welcome" && !m.isError && m.text.trim())
         .map((m) => ({ role: m.isBot ? "assistant" : "user", content: m.text }))
       while (apiMessages.length > 0 && apiMessages[0].role !== "user") apiMessages.shift()
+
+      // Sin Claude configurado se responde con el chatbot por palabras clave, sin una petición que falle.
+      if (aiEnabled === false) {
+        const reply = await askKeywordSupport(textToSend, history)
+        updateBot({ text: reply.text, action: reply.action })
+        return
+      }
 
       const response = await fetch("/api/ai/chat", {
         method: "POST",

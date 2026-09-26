@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Bell, Shield, Palette, Eye, Volume2, Mail, Loader2, CheckCircle2 } from "lucide-react"
+import { Bell, Shield, Palette, Eye, Volume2, Mail, Loader2, CheckCircle2, Languages } from "lucide-react"
+import { LanguageSelect } from "@/components/i18n/language-select"
 import { useToast } from "@/hooks/use-toast"
 import { getUserPreferences, updateUserPreferences } from "@/lib/supabase/services"
 import type { UserPreferences } from "@/lib/supabase/services"
@@ -313,6 +314,25 @@ export default function ConfiguracionPage() {
               />
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* Idioma de avisos y notificaciones */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Languages className="w-5 h-5 text-primary" />
+            <div>
+              <CardTitle className="text-foreground">Idioma de avisos y notificaciones</CardTitle>
+              <CardDescription>
+                Español (México) es el idioma principal. También puedes recibir los avisos, las notificaciones push, los correos y
+                los WhatsApp en inglés o alemán.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <LanguageSelect />
         </CardContent>
       </Card>
 
