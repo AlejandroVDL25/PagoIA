@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, Zap } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { isAbortedRequest } from "@/lib/is-aborted-request"
 
 interface ServicePayment {
   id: string
@@ -135,7 +136,7 @@ export function ServiceStatus() {
       const serviceList = Object.values(serviceMap).slice(0, 10)
       setServices(serviceList)
     } catch (error) {
-      console.error("[ServiceStatus] Error loading services:", error)
+      if (!isAbortedRequest(error)) console.error("[ServiceStatus] Error loading services:", error)
     } finally {
       setLoading(false)
     }

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client"
+import { isAbortedRequest } from "@/lib/is-aborted-request"
 
 export interface Transaction {
   id: string
@@ -139,7 +140,7 @@ export async function getAlerts(unreadOnly: boolean = false) {
     if (error) throw error
     return data as Alert[]
   } catch (error) {
-    console.error("Error fetching alerts:", error)
+    if (!isAbortedRequest(error)) console.error("Error fetching alerts:", error)
     return []
   }
 }

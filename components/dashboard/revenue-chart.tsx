@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts"
 import { createClient } from "@/lib/supabase/client"
 import { forecastNext, type Forecast } from "@/lib/forecast"
+import { isAbortedRequest } from "@/lib/is-aborted-request"
 
 interface ChartPoint {
   key: string
@@ -65,7 +66,7 @@ export function RevenueChart() {
         }
         setPoints(chart)
       } catch (error) {
-        console.error("[RevenueChart] Error loading data:", error)
+        if (!isAbortedRequest(error)) console.error("[RevenueChart] Error loading data:", error)
         setPoints([])
       } finally {
         setLoading(false)
