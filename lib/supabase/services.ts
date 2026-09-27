@@ -72,7 +72,7 @@ export async function getTransactions(limit: number = 10) {
     if (error) throw error
     return data as Transaction[]
   } catch (error) {
-    console.error("Error fetching transactions:", error)
+    if (!isAbortedRequest(error)) console.error("Error fetching transactions:", error)
     return []
   }
 }
@@ -90,7 +90,7 @@ export async function getPredictions() {
     if (error) throw error
     return data as Prediction[]
   } catch (error) {
-    console.error("Error fetching predictions:", error)
+    if (!isAbortedRequest(error)) console.error("Error fetching predictions:", error)
     return []
   }
 }
@@ -112,7 +112,7 @@ export async function getUserServices() {
     if (error) throw error
     return data as UserService[]
   } catch (error) {
-    console.error("Error fetching user services:", error)
+    if (!isAbortedRequest(error)) console.error("Error fetching user services:", error)
     return []
   }
 }
@@ -210,7 +210,7 @@ export async function getMonthlySpendingSummary() {
 
     return summary
   } catch (error) {
-    console.error("Error fetching monthly summary:", error)
+    if (!isAbortedRequest(error)) console.error("Error fetching monthly summary:", error)
     return {}
   }
 }
@@ -234,7 +234,7 @@ export async function getTotalPending() {
     const total = (data as any[]).reduce((sum, t) => sum + t.amount, 0)
     return total
   } catch (error) {
-    console.error("Error fetching pending total:", error)
+    if (!isAbortedRequest(error)) console.error("Error fetching pending total:", error)
     return 0
   }
 }
@@ -261,7 +261,7 @@ export async function getEstimatedSavings() {
 
     return savings > 0 ? savings : 0
   } catch (error) {
-    console.error("Error calculating savings:", error)
+    if (!isAbortedRequest(error)) console.error("Error calculating savings:", error)
     return 0
   }
 }
@@ -283,7 +283,7 @@ export async function getUpcominDueServices(daysAhead: number = 7) {
 
     return upcomingServices
   } catch (error) {
-    console.error("Error fetching upcoming due services:", error)
+    if (!isAbortedRequest(error)) console.error("Error fetching upcoming due services:", error)
     return []
   }
 }
