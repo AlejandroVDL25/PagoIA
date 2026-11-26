@@ -1,6 +1,7 @@
 import Stripe from "stripe"
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { resolveBaseUrl } from "@/lib/app-url"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "")
 
@@ -40,15 +41,8 @@ export async function POST(req: NextRequest) {
 
     console.log(`[API] Processing card payment for user: ${user.id}`)
 
-    // Resolver base URL para permitir despliegue en cualquier hosting/dominio.
-    const forwardedProto = req.headers.get("x-forwarded-proto")
-    const forwardedHost = req.headers.get("x-forwarded-host")
-    const requestOrigin = req.nextUrl.origin
-    const resolvedBaseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      (forwardedHost
-        ? `${forwardedProto || "https"}://${forwardedHost}`
-        : requestOrigin)
+    // success_url / cancel_url siempre apuntan al dominio público (https://pagoia.vercel.app en producción).
+    const resolvedBaseUrl = resolveBaseUrl(req)
 
     // Crear sesión de checkout con Stripe
     const session = await stripe.checkout.sessions.create({

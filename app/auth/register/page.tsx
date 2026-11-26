@@ -5,6 +5,8 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { createClient, isSupabaseClientConfigured } from "@/lib/supabase/client"
+import { startGoogleSignIn } from "@/lib/supabase/oauth"
+import { getAuthCallbackUrl } from "@/lib/app-url"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -53,12 +55,11 @@ export default function RegisterPage() {
     const supabase = createClient()
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || 
-            `${window.location.origin}/auth/callback`,
+          emailRedirectTo: getAuthCallbackUrl(),
           data: {
             full_name: name,
           },
@@ -67,6 +68,19 @@ export default function RegisterPage() {
 
       if (error) {
         setError(authErrorMessage(error.message))
+        return
+      }
+
+      // Con "Confirm email" apagado en Supabase la sesión llega de inmediato.
+      if (data.session) {
+        router.replace("/dashboard")
+        router.refresh()
+        return
+      }
+
+      // Supabase no revela si el correo ya existe: responde con un usuario sin identidades.
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
+        setError("Ya existe una cuenta con ese correo. Inicia sesión o recupera tu contraseña.")
         return
       }
 
@@ -91,15 +105,10 @@ export default function RegisterPage() {
     const supabase = createClient()
 
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
+      const message = await startGoogleSignIn(supabase)
 
-      if (error) {
-        setError(authErrorMessage(error.message))
+      if (message) {
+        setError(authErrorMessage(message))
         setGoogleLoading(false)
       }
     } catch {

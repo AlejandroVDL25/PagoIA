@@ -24,10 +24,15 @@ export default function ResetPasswordPage() {
   const router = useRouter()
   const supabase = createClient()
 
-  // Supabase sends the token as a hash fragment; the SSR client handles it automatically
+  // El enlace de recuperación pasa por /auth/callback, que deja la sesión en cookies.
+  // Si no hay sesión (enlace vencido o abierto directo), avisamos en lugar de fallar al guardar.
   useEffect(() => {
-    // Nothing to do — supabase-js picks up the hash token on its own
-  }, [])
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getUser()
+      if (!data.user) setError("El enlace venció o ya se usó. Pide uno nuevo desde “¿Olvidaste tu contraseña?”.")
+    }
+    void checkSession()
+  }, [supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

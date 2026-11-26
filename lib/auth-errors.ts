@@ -9,5 +9,10 @@ export function authErrorMessage(message: string) {
   if (/same as the old password|should be different/i.test(message)) return "La nueva contraseña debe ser distinta de la anterior."
   if (/auth session missing|session.*(expired|missing)|jwt expired/i.test(message)) return "El enlace venció o ya se usó. Pide uno nuevo desde “¿Olvidaste tu contraseña?”."
   if (/unable to validate email|invalid email/i.test(message)) return "Escribe un correo electrónico válido."
+  if (/link is invalid or has expired|otp_expired|token has expired|invalid flow state/i.test(message)) return "El enlace venció o ya se usó. Inicia sesión; si tu cuenta no está confirmada, pide que te reenviemos el correo."
+  if (/provider is not enabled|unsupported provider/i.test(message)) return "Ese método de acceso no está habilitado. Usa tu correo y contraseña."
+  if (/signups? not allowed|signup is disabled/i.test(message)) return "El registro de cuentas nuevas está desactivado por ahora."
+  if (/database error saving new user/i.test(message)) return "No pudimos crear tu cuenta por un problema del servidor. Intenta de nuevo en unos minutos."
+  if (/failed to fetch|network/i.test(message)) return "No hay conexión con el servidor. Revisa tu internet e intenta de nuevo."
   return message
 }

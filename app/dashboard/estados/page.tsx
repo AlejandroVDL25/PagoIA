@@ -15,80 +15,98 @@ const SERVICE_LABELS: Record<string, string> = {
   electricity: "Electricidad CFE", water: "Agua CONAGUA",
   gas: "Gas PEMEX", internet: "Internet TELMEX",
 }
-const DEMO_INVOICES = [
-  { id: "1", service: "Electricidad CFE", date: "01 Marzo 2026", amount: 2750.00, status: "Pagada", periodo: "Febrero 2026", folio: "CFE-2026-001234" },
-  { id: "2", service: "Agua CONAGUA", date: "05 Marzo 2026", amount: 1040.50, status: "Pagada", periodo: "Febrero 2026", folio: "CNA-2026-005678" },
-  { id: "3", service: "Gas PEMEX", date: "10 Marzo 2026", amount: 1507.75, status: "Pagada", periodo: "Febrero 2026", folio: "PMX-2026-009012" },
-  { id: "4", service: "Internet TELMEX", date: "15 Marzo 2026", amount: 2062.90, status: "Pendiente", periodo: "Marzo 2026", folio: "TLM-2026-003456" },
-]
-const DEMO_REPORTS = [
-  { period: "Enero 2026", total: 6890.15, trend: "+5%", services: 4, prevTotal: 6562.05 },
-  { period: "Febrero 2026", total: 7080.00, trend: "+2.8%", services: 4, prevTotal: 6890.15 },
-  { period: "Marzo 2026", total: 7361.15, trend: "+4%", services: 4, prevTotal: 7080.00 },
-]
-
 type Invoice = { id: string; service: string; date: string; amount: number; status: string; periodo: string; folio: string }
 type Report = { period: string; total: number; trend: string; services: number; prevTotal: number }
+type TransactionRow = {
+  id: string
+  service_type: string | null
+  amount: number | string
+  transaction_date: string
+  status: string
+  receipt_number: string | null
+}
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })
+const fmtPeriod = (iso: string) =>
+  new Date(iso).toLocaleDateString("es-MX", { month: "long", year: "numeric" }).replace(/^\w/, (c) => c.toUpperCase())
+const monthKey = (iso: string) => {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+}
+
+/** Últimos 3 meses con pagos completados, en orden cronológico, con variación contra el mes previo. */
+function buildReports(txs: TransactionRow[]): Report[] {
+  const months = new Map<string, { label: string; total: number; services: Set<string> }>()
+  for (const t of txs) {
+    if (t.status !== "completed") continue
+    const key = monthKey(t.transaction_date)
+    const entry = months.get(key) ?? { label: fmtPeriod(t.transaction_date), total: 0, services: new Set<string>() }
+    entry.total += Number(t.amount)
+    if (t.service_type) entry.services.add(t.service_type)
+    months.set(key, entry)
+  }
+  const keys = [...months.keys()].sort()
+  return keys.slice(-3).map((key) => {
+    const curr = months.get(key)
+    const prevKey = keys[keys.indexOf(key) - 1]
+    const prev = prevKey ? months.get(prevKey)?.total ?? 0 : 0
+    const total = curr?.total ?? 0
+    const pct = prev ? ((total - prev) / prev) * 100 : 0
+    return {
+      period: curr?.label ?? key,
+      total,
+      trend: prev ? `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` : "—",
+      services: curr?.services.size ?? 0,
+      prevTotal: prev,
+    }
+  })
+}
 
 export default function EstadosCuentaPage() {
   const { toast } = useToast()
   const [selectedReport, setSelectedReport] = useState<Report | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
-  const [invoices, setInvoices] = useState<Invoice[]>(DEMO_INVOICES)
-  const [reports, setReports] = useState<Report[]>(DEMO_REPORTS)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [reports, setReports] = useState<Report[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
       try {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const { data: txs, error } = await supabase
+        if (!user) {
+          setLoadError("Tu sesión expiró. Vuelve a iniciar sesión.")
+          return
+        }
+        const { data, error } = await supabase
           .from("transactions")
           .select("id, service_type, amount, transaction_date, status, receipt_number")
           .eq("user_id", user.id)
           .order("transaction_date", { ascending: false })
-          .limit(50)
-        if (error || !txs?.length) return
-        const fmtDate = (iso: string) =>
-          new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" })
-        const fmtPeriod = (iso: string) =>
-          new Date(iso).toLocaleDateString("es-MX", { month: "long", year: "numeric" })
-            .replace(/^\w/, c => c.toUpperCase())
-        const mapped: Invoice[] = txs.map((t: { id: string; service_type: string; amount: number; transaction_date: string; status: string; receipt_number: string | null }) => ({
-          id: t.id,
-          service: SERVICE_LABELS[t.service_type] || t.service_type,
-          date: fmtDate(t.transaction_date),
-          amount: t.amount,
-          status: t.status === "completed" ? "Pagada" : "Pendiente",
-          periodo: fmtPeriod(t.transaction_date),
-          folio: t.receipt_number || `TXN-${t.id.slice(0, 8).toUpperCase()}`,
-        }))
-        setInvoices(mapped)
-        // Build monthly reports
-        const monthMap: Record<string, { total: number; services: Set<string> }> = {}
-        txs.filter((t: { status: string; transaction_date: string; amount: number; service_type: string }) => t.status === "completed").forEach((t: { status: string; transaction_date: string; amount: number; service_type: string }) => {
-          const key = fmtPeriod(t.transaction_date)
-          if (!monthMap[key]) monthMap[key] = { total: 0, services: new Set() }
-          monthMap[key].total += t.amount
-          monthMap[key].services.add(t.service_type)
-        })
-        const periods = Object.keys(monthMap).slice(-3)
-        if (periods.length >= 2) {
-          const built: Report[] = periods.map((p, i) => {
-            const curr = monthMap[p].total
-            const prev = i > 0 ? monthMap[periods[i - 1]].total : 0
-            const pct = prev ? ((curr - prev) / prev * 100) : 0
-            return {
-              period: p, total: curr,
-              trend: `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`,
-              services: monthMap[p].services.size,
-              prevTotal: prev,
-            }
-          })
-          setReports(built)
-        }
-      } catch (e) { console.error("[Estados] Error:", e) }
+          .limit(200)
+        if (error) throw error
+        const txs: TransactionRow[] = data ?? []
+        setInvoices(
+          txs.map((t) => ({
+            id: t.id,
+            service: (t.service_type && SERVICE_LABELS[t.service_type]) || t.service_type || "Servicio",
+            date: fmtDate(t.transaction_date),
+            amount: Number(t.amount),
+            status: t.status === "completed" ? "Pagada" : "Pendiente",
+            periodo: fmtPeriod(t.transaction_date),
+            folio: t.receipt_number || `TXN-${t.id.slice(0, 8).toUpperCase()}`,
+          })),
+        )
+        setReports(buildReports(txs))
+      } catch (e) {
+        console.error("[Estados] Error:", e)
+        setLoadError("No pudimos cargar tus estados de cuenta. Intenta de nuevo en unos minutos.")
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])
@@ -175,6 +193,7 @@ export default function EstadosCuentaPage() {
         <Button
           variant="outline"
           onClick={downloadAllCSV}
+          disabled={invoices.length === 0}
           className="gap-2 border-primary/40 text-primary hover:bg-primary/10 hover:border-primary"
         >
           <FileDown className="w-4 h-4" />
@@ -188,7 +207,23 @@ export default function EstadosCuentaPage() {
           <TabsTrigger value="informes">Informes Mensuales</TabsTrigger>
         </TabsList>
 
+        {loadError && (
+          <Card className="mt-6 border-destructive/40 bg-destructive/10">
+            <CardContent className="p-4 text-sm text-destructive">{loadError}</CardContent>
+          </Card>
+        )}
+
         <TabsContent value="facturas" className="space-y-3 mt-6">
+          {loading && (
+            <p className="text-sm text-muted-foreground">Cargando tus pagos…</p>
+          )}
+          {!loading && !loadError && invoices.length === 0 && (
+            <Card>
+              <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                Aún no tienes pagos registrados. Cuando pagues un servicio desde “Mis Servicios”, aparecerá aquí con su comprobante.
+              </CardContent>
+            </Card>
+          )}
           {invoices.map((invoice) => (
             <Card key={invoice.id} className="hover:border-primary/50 transition-all hover:shadow-md group">
               <CardContent className="flex items-center justify-between p-4 sm:p-5 gap-4">
@@ -224,6 +259,13 @@ export default function EstadosCuentaPage() {
         </TabsContent>
 
         <TabsContent value="informes" className="space-y-4 mt-6">
+          {!loading && !loadError && reports.length === 0 && (
+            <Card>
+              <CardContent className="p-6 text-center text-sm text-muted-foreground">
+                Los informes mensuales se generan con tus pagos completados. Todavía no hay meses con pagos.
+              </CardContent>
+            </Card>
+          )}
           <div className="grid md:grid-cols-3 gap-4">
             {reports.map((report, idx) => {
               const trendUp = report.trend.startsWith("+")

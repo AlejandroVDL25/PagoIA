@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { createClient } from "@/lib/supabase/server"
+import { isAdminUser } from "@/lib/admin-auth"
 
-// Helper to check if user is admin (for now, just check if authenticated)
-async function isAdmin(token?: string): Promise<boolean> {
-  // In a real app, you'd check a roles table
-  // For now, only allow if internal token is provided
-  return !!token?.startsWith("internal-admin-")
+/** Permite escribir el catálogo con el token interno (scripts) o con una sesión de administrador (panel). */
+async function isAuthorizedAdmin(req: NextRequest): Promise<boolean> {
+  const internalToken = req.headers.get("x-internal-token")
+  if (internalToken && process.env.INTERNAL_API_TOKEN && internalToken === process.env.INTERNAL_API_TOKEN) {
+    return true
+  }
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    return isAdminUser(user)
+  } catch {
+    return false
+  }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const supabase = createAdminClient()
 
@@ -39,12 +49,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const internalToken = req.headers.get("x-internal-token")
-    if (!internalToken || internalToken !== process.env.INTERNAL_API_TOKEN) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
+    if (!(await isAuthorizedAdmin(req))) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
     const body = await req.json()
@@ -91,12 +97,8 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const internalToken = req.headers.get("x-internal-token")
-    if (!internalToken || internalToken !== process.env.INTERNAL_API_TOKEN) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
+    if (!(await isAuthorizedAdmin(req))) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
     const body = await req.json()
@@ -145,12 +147,8 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const internalToken = req.headers.get("x-internal-token")
-    if (!internalToken || internalToken !== process.env.INTERNAL_API_TOKEN) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
+    if (!(await isAuthorizedAdmin(req))) {
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 })
     }
 
     const { searchParams } = new URL(req.url)

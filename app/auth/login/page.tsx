@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { createClient, isSupabaseClientConfigured } from "@/lib/supabase/client"
+import { startGoogleSignIn } from "@/lib/supabase/oauth"
+import { getAuthCallbackUrl, safeNextPath } from "@/lib/app-url"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,11 +26,52 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
+  const [needsConfirmation, setNeedsConfirmation] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [nextPath, setNextPath] = useState("/dashboard")
   const router = useRouter()
+
+  // Errores que regresa /auth/callback (enlace vencido, proveedor apagado, etc.) y ruta de regreso.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const callbackError = params.get("error")
+    if (callbackError) setError(authErrorMessage(callbackError))
+    setNextPath(safeNextPath(params.get("next")))
+  }, [])
+
+  const handleResendConfirmation = async () => {
+    setError(null)
+    setNotice(null)
+    if (!email) {
+      setError("Escribe tu correo para reenviarte el enlace de confirmación.")
+      return
+    }
+    setResendLoading(true)
+    try {
+      const { error } = await createClient().auth.resend({
+        type: "signup",
+        email,
+        options: { emailRedirectTo: getAuthCallbackUrl() },
+      })
+      if (error) {
+        setError(authErrorMessage(error.message))
+        return
+      }
+      setNotice("Te enviamos un nuevo enlace de confirmación. Revisa tu bandeja de entrada y la carpeta de spam.")
+      setNeedsConfirmation(false)
+    } catch {
+      setError("No pudimos reenviar el correo. Intenta de nuevo en unos minutos.")
+    } finally {
+      setResendLoading(false)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setNotice(null)
+    setNeedsConfirmation(false)
 
     if (!isSupabaseClientConfigured()) {
       setError("La autenticación quedará disponible cuando se complete la configuración pendiente.")
@@ -46,11 +89,12 @@ export default function LoginPage() {
       })
 
       if (error) {
+        setNeedsConfirmation(/email not confirmed/i.test(error.message))
         setError(authErrorMessage(error.message))
         return
       }
 
-      router.push("/dashboard")
+      router.replace(nextPath)
       router.refresh()
     } catch {
       setError("Ocurrió un error inesperado")
@@ -72,15 +116,10 @@ export default function LoginPage() {
     const supabase = createClient()
 
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
+      const message = await startGoogleSignIn(supabase)
 
-      if (error) {
-        setError(authErrorMessage(error.message))
+      if (message) {
+        setError(authErrorMessage(message))
         setGoogleLoading(false)
       }
     } catch {
@@ -111,6 +150,26 @@ export default function LoginPage() {
               <Alert variant="destructive" className="bg-destructive/10 border-destructive/50">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{t(error)}</AlertDescription>
+              </Alert>
+            )}
+
+            {needsConfirmation && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleResendConfirmation}
+                disabled={resendLoading}
+              >
+                {resendLoading ? <Spinner className="mr-2" /> : <Mail className="mr-2 h-4 w-4" />}
+                {t("Reenviar correo de confirmación")}
+              </Button>
+            )}
+
+            {notice && (
+              <Alert className="bg-primary/10 border-primary/40">
+                <Mail className="h-4 w-4" />
+                <AlertDescription>{t(notice)}</AlertDescription>
               </Alert>
             )}
 

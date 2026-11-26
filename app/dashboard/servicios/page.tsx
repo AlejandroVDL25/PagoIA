@@ -105,13 +105,8 @@ export default function MisServiciosPage() {
         }))
         setServices(mapped)
       } else {
-        // Default services seeded locally if user has no services yet
-        setServices([
-          { dbId: null, icon: Zap, name: "Electricidad", id: "electricity-default", company: "CFE", amount: 2750, dueDate: "20/04/2026", status: "Vencida" },
-          { dbId: null, icon: Droplet, name: "Agua", id: "water-default", company: "CONAGUA", amount: 1040, dueDate: "15/04/2026", status: "Pagada" },
-          { dbId: null, icon: Flame, name: "Gas", id: "gas-default", company: "PEMEX Gas", amount: 1507, dueDate: "18/04/2026", status: "Próxima" },
-          { dbId: null, icon: Wifi, name: "Internet", id: "internet-default", company: "TELMEX", amount: 2062, dueDate: "25/04/2026", status: "Próxima" },
-        ])
+        // Sin servicios guardados: se muestra el estado vacío, nunca montos inventados que se puedan cobrar.
+        setServices([])
       }
     } catch {
       toast({ title: "Error", description: "No se pudieron cargar los servicios", variant: "destructive" })
@@ -329,6 +324,19 @@ export default function MisServiciosPage() {
             </div>
           ))}
         </div>
+      ) : services.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+            <p className="font-semibold text-foreground">Todavía no tienes servicios registrados</p>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Agrega tu luz, agua, gas o internet con el monto y día de vencimiento de tu recibo para pagarlo y recibir recordatorios.
+            </p>
+            <Button className="rounded-full" onClick={() => setAddDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Agregar mi primer servicio
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         {services.map((service) => (

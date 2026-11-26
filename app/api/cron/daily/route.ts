@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getBaseUrl } from "@/lib/app-url"
 import { createAlertAndPush } from "@/lib/notifications/push"
 import { sendEmail } from "@/lib/notifications/email"
 import { normalizeMxPhone, sendWhatsAppTemplate } from "@/lib/notifications/whatsapp"
@@ -184,7 +185,7 @@ export async function GET(req: NextRequest) {
             if (sent) stats.whatsapp++
           } else {
             const { email, locale } = await getContact()
-            if (email) sent = await sendEmail({ to: email, subject: translate(title, locale), text: translate(`${body}\n\nPaga desde PagoIA: ${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard/servicios`, locale) })
+            if (email) sent = await sendEmail({ to: email, subject: translate(title, locale), text: translate(`${body}\n\nPaga desde PagoIA: ${getBaseUrl()}/dashboard/servicios`, locale) })
             if (sent) stats.emails++
           }
           if (sent) {

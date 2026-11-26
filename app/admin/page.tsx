@@ -1,48 +1,23 @@
-"use client"
-
-import { useEffect, useState } from "react"
 import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/server"
+import { isAdminUser } from "@/lib/admin-auth"
 import { AdminServicesPanel } from "@/components/admin/services-panel"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle } from "lucide-react"
 
-export default function AdminPage() {
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [loading, setLoading] = useState(true)
+export const dynamic = "force-dynamic"
 
-  useEffect(() => {
-    const checkAdmin = async () => {
-      try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+export default async function AdminPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-        if (!user) {
-          redirect("/auth/login")
-        }
-
-        // Simple check: user with admin email or specific condition
-        // In production, check roles table
-        const isAdminUser =
-          user.email?.includes("admin") ||
-          user.email === "test@example.com" // Allow test user for demo
-
-        setIsAdmin(isAdminUser)
-        setLoading(false)
-      } catch (error) {
-        console.error("Error checking admin status:", error)
-        setLoading(false)
-      }
-    }
-
-    checkAdmin()
-  }, [])
-
-  if (loading) {
-    return <div className="flex items-center justify-center h-screen">Cargando...</div>
+  if (!user) {
+    redirect("/auth/login?next=/admin")
   }
 
-  if (!isAdmin) {
+  if (!isAdminUser(user)) {
     return (
       <div className="container mx-auto py-10">
         <Card className="bg-amber-500/10 border-amber-500/30">
