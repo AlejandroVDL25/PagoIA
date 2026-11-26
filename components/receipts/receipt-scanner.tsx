@@ -32,7 +32,22 @@ const SERVICE_LABELS: Record<string, string> = {
   other: "Otro",
 }
 
-const CONSENT_KEY = "pagoia-receipt-consent-v1"
+const CONSENT_KEY = "pagoia-receipt-consent-v2"
+
+type ProviderInfo = { provider: string; company: string; country: string; trainsOnFreeTier: boolean }
+
+/** Valida la respuesta de GET /api/receipts/scan; null si el escaneo no está disponible. */
+function parseProviderInfo(value: unknown): ProviderInfo | null {
+  if (typeof value !== "object" || value === null) return null
+  const v = value as Record<string, unknown>
+  if (v.enabled !== true || typeof v.provider !== "string" || typeof v.company !== "string") return null
+  return {
+    provider: v.provider,
+    company: v.company,
+    country: typeof v.country === "string" ? v.country : "",
+    trainsOnFreeTier: v.trainsOnFreeTier === true,
+  }
+}
 
 type Receipt = {
   id: string
@@ -101,19 +116,30 @@ export function ReceiptScanner() {
   const [form, setForm] = useState<Form | null>(null)
   const [history, setHistory] = useState<Receipt[]>([])
   const [scanEnabled, setScanEnabled] = useState<boolean | null>(null)
+  const [providerInfo, setProviderInfo] = useState<ProviderInfo | null>(null)
 
   useEffect(() => {
     fetch("/api/receipts/scan")
-      .then((r) => (r.ok ? r.json() : { enabled: false }))
-      .then((d) => setScanEnabled(Boolean(d.enabled)))
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: unknown) => {
+        const info = parseProviderInfo(d)
+        setProviderInfo(info)
+        setScanEnabled(info !== null)
+      })
       .catch(() => setScanEnabled(false))
   }, [])
 
+  // El consentimiento se guarda por proveedor: si cambia la empresa que recibe la imagen, se vuelve a pedir.
+  const consentKey = providerInfo ? `${CONSENT_KEY}-${providerInfo.provider}` : null
+
   useEffect(() => {
+    if (!consentKey) return
     try {
-      setConsent(localStorage.getItem(CONSENT_KEY) === "1")
-    } catch {}
-  }, [])
+      setConsent(localStorage.getItem(consentKey) === "1")
+    } catch {
+      setConsent(false)
+    }
+  }, [consentKey])
 
   const loadHistory = useCallback(async () => {
     const { data } = await supabase.from("receipts").select("*").order("created_at", { ascending: false }).limit(10)
@@ -126,10 +152,13 @@ export function ReceiptScanner() {
 
   const acceptConsent = (checked: boolean) => {
     setConsent(checked)
+    if (!consentKey) return
     try {
-      if (checked) localStorage.setItem(CONSENT_KEY, "1")
-      else localStorage.removeItem(CONSENT_KEY)
-    } catch {}
+      if (checked) localStorage.setItem(consentKey, "1")
+      else localStorage.removeItem(consentKey)
+    } catch {
+      // Sin almacenamiento local se vuelve a pedir el consentimiento en la siguiente visita.
+    }
   }
 
   const handleFile = async (file: File | undefined) => {
@@ -296,8 +325,11 @@ export function ReceiptScanner() {
           <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm" htmlFor="rc-consent">
             <Checkbox checked={consent} onCheckedChange={(v) => acceptConsent(v === true)} className="mt-0.5 size-5" id="rc-consent" />
             <span>
-              Acepto que la imagen de mi recibo se envíe a Anthropic (Estados Unidos) solo para extraer sus datos. Guardamos
-              únicamente los últimos 4 dígitos de mi número de servicio.
+              Acepto que la imagen de mi recibo se envíe a {providerInfo?.company ?? "un servicio de IA"}
+              {providerInfo ? ` (${providerInfo.country})` : ""} para extraer sus datos.
+              {providerInfo?.trainsOnFreeTier &&
+                " Este servicio usa el plan gratuito, en el que el proveedor puede usar el contenido para mejorar sus productos."}{" "}
+              PagoIA guarda únicamente los últimos 4 dígitos de mi número de servicio.
             </span>
           </label>
 

@@ -1,8 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk"
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
-import { IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_PDF_BYTES, confidenceOf, extractReceipt } from "@/lib/ai/receipt"
+import { IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_PDF_BYTES, confidenceOf } from "@/lib/ai/receipt"
+import { PROVIDER_INFO, extractReceiptData, getReceiptProvider } from "@/lib/ai/receipt-provider"
+import { AiProviderError } from "@/lib/ai/errors"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -14,14 +15,21 @@ const typeFromPath = (path: string) => {
   return ext === "pdf" ? "application/pdf" : ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg"
 }
 
-/** Indica a la interfaz si el escaneo está disponible, para no subir archivos que no se podrán leer. */
+/** Indica a la interfaz si el escaneo está disponible y con qué proveedor, para pedir el consentimiento correcto. */
 export async function GET() {
-  return NextResponse.json({ enabled: Boolean(process.env.ANTHROPIC_API_KEY) })
+  const provider = getReceiptProvider()
+  return NextResponse.json({
+    enabled: provider !== null,
+    provider,
+    company: provider ? PROVIDER_INFO[provider].company : null,
+    country: provider ? PROVIDER_INFO[provider].country : null,
+    trainsOnFreeTier: provider ? PROVIDER_INFO[provider].trainsOnFreeTier : false,
+  })
 }
 
 /** Recibe la ruta de un archivo ya subido a receipts/{uid}/ y devuelve los datos extraídos para revisión. */
 export async function POST(req: NextRequest) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!getReceiptProvider()) {
     return NextResponse.json({ error: "El escaneo de recibos no está configurado en este servidor." }, { status: 503 })
   }
 
@@ -42,14 +50,15 @@ export async function POST(req: NextRequest) {
   const { data: blob, error: downloadError } = await supabase.storage.from("receipts").download(path)
   if (downloadError || !blob) return NextResponse.json({ error: "No se encontró el archivo" }, { status: 404 })
 
-  const mediaType = IMAGE_TYPES.includes(blob.type as (typeof IMAGE_TYPES)[number]) || blob.type === "application/pdf" ? blob.type : typeFromPath(path)
+  const mediaType =
+    IMAGE_TYPES.includes(blob.type as (typeof IMAGE_TYPES)[number]) || blob.type === "application/pdf" ? blob.type : typeFromPath(path)
   const limit = mediaType === "application/pdf" ? MAX_PDF_BYTES : MAX_IMAGE_BYTES
   if (blob.size > limit) {
     return NextResponse.json({ error: `El archivo pesa más de ${Math.round(limit / 1024 / 1024)} MB` }, { status: 413 })
   }
 
   try {
-    const extraction = await extractReceipt(await blob.arrayBuffer(), mediaType)
+    const { provider, data: extraction } = await extractReceiptData(await blob.arrayBuffer(), mediaType)
     if (!extraction.es_recibo) {
       return NextResponse.json({ error: "No parece un recibo de servicio. Prueba con otra foto." }, { status: 422 })
     }
@@ -68,7 +77,7 @@ export async function POST(req: NextRequest) {
         amount: extraction.total,
         consumption: extraction.consumo,
         consumption_unit: extraction.unidad_consumo,
-        extracted: extraction,
+        extracted: { ...extraction, ai_provider: provider },
         confidence: confidenceOf(extraction),
       })
       .select()
@@ -80,15 +89,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ receipt, dudosos: extraction.campos_dudosos })
   } catch (error) {
+    if (error instanceof AiProviderError) {
+      console.error("[receipts/scan]", error.message)
+      return NextResponse.json({ error: error.userMessage }, { status: error.status })
+    }
     console.error("[receipts/scan]", error)
-    const message =
-      error instanceof Anthropic.RateLimitError
-        ? "El servicio está ocupado. Intenta de nuevo en un minuto."
-        : error instanceof Anthropic.APIError
-          ? "No se pudo analizar el recibo en este momento."
-          : error instanceof Error
-            ? error.message
-            : "No se pudo analizar el recibo."
-    return NextResponse.json({ error: message }, { status: 502 })
+    return NextResponse.json({ error: "No se pudo analizar el recibo." }, { status: 502 })
   }
 }
