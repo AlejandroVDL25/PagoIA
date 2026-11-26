@@ -11,7 +11,16 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { useLocale } from "@/components/i18n/locale-provider"
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer"
 import { createClient } from "@/lib/supabase/client"
+import { compressImage } from "@/lib/image-compress"
 import { cn } from "@/lib/utils"
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -52,7 +61,14 @@ type Form = {
   consumption: string
 }
 
-type Stage = "idle" | "uploading" | "analyzing" | "review" | "saving"
+type Stage = "idle" | "compressing" | "uploading" | "analyzing" | "review" | "saving"
+
+const STAGE_MESSAGES: Partial<Record<Stage, string>> = {
+  compressing: "Preparando la foto…",
+  uploading: "Subiendo tu recibo…",
+  analyzing: "La IA está leyendo tu recibo…",
+  saving: "Guardando…",
+}
 
 const toForm = (r: Receipt): Form => ({
   provider: r.provider ?? "",
@@ -64,17 +80,8 @@ const toForm = (r: Receipt): Form => ({
   consumption: r.consumption != null ? String(r.consumption) : "",
 })
 
-/** Reduce fotos grandes del celular a 2000 px en JPEG para no rebasar el límite de 5 MB. */
-async function prepareImage(file: File): Promise<Blob> {
-  if (!file.type.startsWith("image/") || file.size < 1.5 * 1024 * 1024) return file
-  const bitmap = await createImageBitmap(file)
-  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement("canvas")
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  return new Promise((resolve) => canvas.toBlob((b) => resolve(b ?? file), "image/jpeg", 0.85))
-}
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
+const MAX_PDF_MB = 10
 
 const formatMoney = (n: number | null) =>
   n == null ? "—" : n.toLocaleString("es-MX", { style: "currency", currency: "MXN" })
@@ -128,21 +135,34 @@ export function ReceiptScanner() {
   const handleFile = async (file: File | undefined) => {
     // Sin escaneo activo no se sube nada: el archivo quedaría guardado sin poder leerse.
     if (!file || scanEnabled !== true) return
-    if (!["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type)) {
+    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
       toast({ title: "Formato no compatible", description: "Sube una foto (JPG, PNG o WebP) o un PDF.", variant: "destructive" })
+      return
+    }
+    if (file.type === "application/pdf" && file.size > MAX_PDF_MB * 1024 * 1024) {
+      toast({ title: "PDF muy pesado", description: `El PDF debe pesar menos de ${MAX_PDF_MB} MB.`, variant: "destructive" })
       return
     }
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      toast({ title: "Tu sesión expiró", description: "Vuelve a iniciar sesión para escanear.", variant: "destructive" })
+      return
+    }
 
-    setStage("uploading")
+    setStage("compressing")
     try {
-      const blob = await prepareImage(file)
-      const ext = blob.type === "application/pdf" ? "pdf" : blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg"
+      // La foto se reduce en el teléfono (1600 px, JPEG 0.82) y se sube directo a Supabase Storage;
+      // el servidor solo recibe la ruta, así que nunca se acerca al límite de 4.5 MB de Vercel.
+      const { blob, type } = await compressImage(file)
+      if (!ACCEPTED_TYPES.includes(type)) {
+        throw new Error("Tu navegador no pudo convertir esta foto. Tómala de nuevo o súbela como JPG.")
+      }
+      setStage("uploading")
+      const ext = type === "application/pdf" ? "pdf" : type === "image/png" ? "png" : type === "image/webp" ? "webp" : "jpg"
       const path = `${user.id}/${Date.now()}.${ext}`
-      const { error: uploadError } = await supabase.storage.from("receipts").upload(path, blob, { contentType: blob.type })
+      const { error: uploadError } = await supabase.storage.from("receipts").upload(path, blob, { contentType: type })
       if (uploadError) throw new Error("No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.")
 
       setStage("analyzing")
@@ -231,12 +251,12 @@ export function ReceiptScanner() {
           step={type === "number" ? "0.01" : undefined}
           value={form?.[key] ?? ""}
           onChange={(e) => setForm((f) => (f ? { ...f, [key]: e.target.value } : f))}
-          className={cn(dudoso && "border-amber-500 ring-2 ring-amber-500/30")}
+          className={cn("h-12 text-base", dudoso && "border-amber-500 ring-2 ring-amber-500/30")}
           aria-describedby={dudoso ? `rc-${key}-hint` : undefined}
         />
         {dudoso ? (
-          <p id={`rc-${key}-hint`} className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
-            <AlertTriangle className="h-3 w-3" /> No se leía bien. Revisa este dato.
+          <p id={`rc-${key}-hint`} className="flex items-center gap-1 text-sm text-amber-800 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4" aria-hidden="true" /> No se leía bien. Revisa este dato.
           </p>
         ) : hint ? (
           <p className="text-xs text-muted-foreground">{hint}</p>
@@ -245,104 +265,147 @@ export function ReceiptScanner() {
     )
   }
 
-  const busy = stage === "uploading" || stage === "analyzing" || stage === "saving"
+  const busy = stage === "compressing" || stage === "uploading" || stage === "analyzing" || stage === "saving"
+  const reviewOpen = (stage === "review" || stage === "saving") && form !== null && current !== null
+  const canScan = consent && !busy && scanEnabled === true
+
+  const closeReview = (open: boolean) => {
+    // Cerrar la hoja (deslizar o Escape) deja el recibo "Por revisar" en el historial; no se pierde.
+    if (!open && stage === "review") {
+      setStage("idle")
+      setCurrent(null)
+      setForm(null)
+      setDudosos([])
+      loadHistory()
+    }
+  }
 
   return (
     <div className="space-y-6">
-      {stage !== "review" && stage !== "saving" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ScanLine className="h-5 w-5 text-brand-spark" /> Escanear un recibo
-            </CardTitle>
-            <CardDescription>
-              Tómale foto a tu recibo de luz, agua, gas o internet, o sube el PDF. Capturamos el monto, la fecha límite y el
-              periodo; tú revisas antes de guardar.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
-              <Checkbox checked={consent} onCheckedChange={(v) => acceptConsent(v === true)} className="mt-0.5" id="rc-consent" />
-              <span>
-                Acepto que la imagen de mi recibo se envíe a Anthropic (Estados Unidos) solo para extraer sus datos. Guardamos
-                únicamente los últimos 4 dígitos de mi número de servicio.
-              </span>
-            </label>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ScanLine className="h-5 w-5 text-brand-spark" aria-hidden="true" /> Escanear un recibo
+          </CardTitle>
+          <CardDescription>
+            Tómale foto a tu recibo de luz, agua, gas o internet, o sube el PDF. La IA captura el monto, la fecha límite y el
+            periodo; tú revisas antes de guardar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <label className="flex min-h-12 items-start gap-3 rounded-lg border border-border bg-muted/40 p-3 text-sm" htmlFor="rc-consent">
+            <Checkbox checked={consent} onCheckedChange={(v) => acceptConsent(v === true)} className="mt-0.5 size-5" id="rc-consent" />
+            <span>
+              Acepto que la imagen de mi recibo se envíe a Anthropic (Estados Unidos) solo para extraer sus datos. Guardamos
+              únicamente los últimos 4 dígitos de mi número de servicio.
+            </span>
+          </label>
 
-            {scanEnabled === false && (
-              <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300" role="status">
-                {t("El escaneo con IA todavía no está activado en este sitio. Mientras tanto, agrega tus recibos desde Mis Pagos.")}
-              </p>
-            )}
+          {scanEnabled === false && (
+            <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200" role="status">
+              {t("El escaneo con IA todavía no está activado en este sitio. Mientras tanto, agrega tus recibos desde Mis Pagos.")}
+            </p>
+          )}
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Button size="lg" disabled={!consent || busy || scanEnabled !== true} onClick={() => cameraInput.current?.click()} className="h-14">
-                <Camera className="mr-2 h-5 w-5" /> Tomar foto
-              </Button>
-              <Button size="lg" variant="outline" disabled={!consent || busy || scanEnabled !== true} onClick={() => fileInput.current?.click()} className="h-14">
-                <FileUp className="mr-2 h-5 w-5" /> Subir foto o PDF
-              </Button>
-            </div>
-            <input ref={cameraInput} type="file" accept="image/*" capture="environment" hidden onChange={(e) => handleFile(e.target.files?.[0])} />
-            <input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" hidden onChange={(e) => handleFile(e.target.files?.[0])} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button size="lg" disabled={!canScan} onClick={() => cameraInput.current?.click()} className="h-14 text-base">
+              <Camera className="mr-2 h-5 w-5" aria-hidden="true" /> Tomar foto
+            </Button>
+            <Button size="lg" variant="outline" disabled={!canScan} onClick={() => fileInput.current?.click()} className="h-14 text-base">
+              <FileUp className="mr-2 h-5 w-5" aria-hidden="true" /> Subir foto o PDF
+            </Button>
+          </div>
+          {!consent && scanEnabled === true && (
+            <p className="text-sm text-muted-foreground">Marca la casilla de arriba para activar la cámara.</p>
+          )}
+          <input
+            ref={cameraInput}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={(e) => handleFile(e.target.files?.[0])}
+          />
+          <input
+            ref={fileInput}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+            hidden
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={(e) => handleFile(e.target.files?.[0])}
+          />
 
+          <div aria-live="polite" role="status" className="min-h-6">
             {busy && (
-              <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {stage === "uploading" ? "Subiendo tu recibo…" : "Leyendo tu recibo…"}
+              <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
+                {STAGE_MESSAGES[stage]}
               </p>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardContent>
+      </Card>
 
-      {(stage === "review" || stage === "saving") && form && current && (
-        <Card className="border-primary/40">
-          <CardHeader>
-            <CardTitle>Revisa lo que capturamos</CardTitle>
-            <CardDescription>
+      <Drawer open={reviewOpen} onOpenChange={closeReview}>
+        <DrawerContent className="mx-auto w-full max-w-2xl data-[vaul-drawer-direction=bottom]:max-h-[92dvh]">
+          <DrawerHeader className="text-left">
+            <DrawerTitle className="text-lg">Revisa lo que capturó la IA</DrawerTitle>
+            <DrawerDescription>
               {dudosos.length === 0
                 ? "Todos los campos se leyeron con claridad. Corrige lo que haga falta y confirma."
                 : `Revisa los ${dudosos.length} campos marcados en ámbar antes de confirmar.`}
-              {current.service_number_last4 && ` Número de servicio terminación ${current.service_number_last4}.`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              {field("provider", "Proveedor")}
-              <div className="space-y-1.5">
-                <Label htmlFor="rc-service">Servicio</Label>
-                <Select value={form.service_type} onValueChange={(v) => setForm((f) => (f ? { ...f, service_type: v } : f))}>
-                  <SelectTrigger id="rc-service" className={cn(dudosos.includes("tipo_servicio") && "border-amber-500 ring-2 ring-amber-500/30")}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(SERVICE_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {current?.service_number_last4 && ` Número de servicio terminación ${current.service_number_last4}.`}
+              {current?.confidence != null && ` Confianza de lectura: ${Math.round(current.confidence * 100)} %.`}
+            </DrawerDescription>
+          </DrawerHeader>
+          {form && current && (
+            <div className="overflow-y-auto px-4 pb-2">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {field("provider", "Proveedor")}
+                <div className="space-y-1.5">
+                  <Label htmlFor="rc-service">Servicio</Label>
+                  <Select value={form.service_type} onValueChange={(v) => setForm((f) => (f ? { ...f, service_type: v } : f))}>
+                    <SelectTrigger
+                      id="rc-service"
+                      className={cn("h-12 w-full text-base", dudosos.includes("tipo_servicio") && "border-amber-500 ring-2 ring-amber-500/30")}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(SERVICE_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value} className="min-h-11 text-base">
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {field("amount", "Total a pagar (MXN)", "number")}
+                {field("due_date", "Fecha límite de pago", "date")}
+                {field("period_start", "Inicio del periodo", "date")}
+                {field("period_end", "Fin del periodo", "date")}
+                {field("consumption", `Consumo${current.consumption_unit ? ` (${current.consumption_unit})` : ""}`, "number")}
               </div>
-              {field("amount", "Total a pagar (MXN)", "number")}
-              {field("due_date", "Fecha límite de pago", "date")}
-              {field("period_start", "Inicio del periodo", "date")}
-              {field("period_end", "Fin del periodo", "date")}
-              {field("consumption", `Consumo${current.consumption_unit ? ` (${current.consumption_unit})` : ""}`, "number")}
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-              <Button variant="outline" disabled={stage === "saving"} onClick={() => review("reject")}>
-                Descartar
-              </Button>
-              <Button disabled={stage === "saving"} onClick={() => review("confirm")}>
-                {stage === "saving" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                Confirmar y crear pago
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+          <DrawerFooter className="pb-[calc(1rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
+            <Button disabled={stage === "saving"} onClick={() => review("confirm")} className="h-12 text-base sm:order-2">
+              {stage === "saving" ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
+              ) : (
+                <CheckCircle2 className="mr-2 h-5 w-5" aria-hidden="true" />
+              )}
+              Confirmar y crear pago
+            </Button>
+            <Button variant="outline" disabled={stage === "saving"} onClick={() => review("reject")} className="h-12 text-base sm:order-1">
+              Descartar
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
       <Card>
         <CardHeader>

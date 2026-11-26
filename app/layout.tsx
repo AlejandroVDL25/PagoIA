@@ -14,6 +14,10 @@ const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-geist-mono'
 const bricolage = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-bricolage', display: 'swap' })
 
 export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  // "cover" hace que env(safe-area-inset-*) funcione en iPhone con notch o barra de inicio.
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#f3f6f9' },
     { media: '(prefers-color-scheme: dark)', color: '#0a1929' },
