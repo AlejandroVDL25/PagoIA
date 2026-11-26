@@ -313,18 +313,18 @@ export function HomeOverview() {
   const monthLabel = new Date().toLocaleDateString("es-MX", { month: "long" })
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-6">
       {/* ── Tarjeta principal ── */}
       <section
         aria-labelledby="hero-title"
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-700 to-cyan-800 p-5 text-white shadow-lg sm:p-6"
+        className="relative w-full max-w-full overflow-hidden rounded-2xl bg-gradient-to-br from-sky-700 to-cyan-800 p-4 text-white shadow-lg sm:p-6"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 id="hero-title" className="text-sm font-medium text-white/90">
               Pagado en {monthLabel}
             </h2>
-            <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight sm:text-4xl" aria-live="polite">
+            <p className="mt-1 truncate text-2xl font-bold tabular-nums tracking-tight sm:text-4xl" aria-live="polite">
               {loading ? <span className="inline-block h-9 w-40 animate-pulse rounded bg-white/20" aria-label="Cargando" /> : money(overview.paidThisMonth)}
             </p>
           </div>
@@ -339,14 +339,14 @@ export function HomeOverview() {
           </button>
         </div>
 
-        <dl className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-white/10 p-3">
-            <dt className="text-sm text-white/90">Por pagar</dt>
-            <dd className="mt-0.5 text-lg font-semibold tabular-nums">{loading ? "…" : money(overview.toPay)}</dd>
+        <dl className="mt-5 grid w-full grid-cols-2 gap-2.5 sm:gap-4">
+          <div className="min-w-0 rounded-xl bg-white/10 p-3 sm:p-4">
+            <dt className="truncate text-sm text-white/90">Por pagar</dt>
+            <dd className="mt-0.5 truncate text-lg font-semibold tabular-nums sm:text-2xl">{loading ? "…" : money(overview.toPay)}</dd>
           </div>
-          <div className="rounded-xl bg-white/10 p-3">
-            <dt className="text-sm text-white/90">Vencen en 7 días</dt>
-            <dd className="mt-0.5 text-lg font-semibold tabular-nums">
+          <div className="min-w-0 rounded-xl bg-white/10 p-3 sm:p-4">
+            <dt className="text-sm leading-tight text-white/90">Vencen en 7 días</dt>
+            <dd className="mt-0.5 truncate text-lg font-semibold tabular-nums sm:text-2xl">
               {loading ? "…" : `${overview.dueSoon} ${overview.dueSoon === 1 ? "pago" : "pagos"}`}
             </dd>
           </div>
@@ -354,7 +354,7 @@ export function HomeOverview() {
 
         <Link
           href="/dashboard/servicios"
-          className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-base font-semibold text-sky-800 transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sky-700"
+          className="mt-5 flex min-h-12 w-full max-w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold sm:text-base text-sky-800 transition-colors hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-sky-700"
         >
           <CreditCard className="h-5 w-5" aria-hidden="true" />
           Pagar mis servicios
@@ -376,23 +376,23 @@ export function HomeOverview() {
 
       {/* ── Acciones rápidas ── */}
       <nav aria-label="Acciones rápidas">
-        <ul className="grid grid-cols-4 gap-2 sm:gap-4">
+        <ul className="grid w-full grid-cols-4 gap-2 sm:gap-4">
           {QUICK_ACTIONS.map((action) => (
-            <li key={action.href}>
+            <li key={action.href} className="min-w-0">
               <Link
                 href={action.href}
                 aria-label={action.ariaLabel}
-                className="group flex min-h-24 flex-col items-center gap-2 rounded-2xl p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex min-h-24 min-w-0 flex-col items-center justify-center rounded-2xl p-1 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span
                   className={cn(
-                    "flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card text-primary shadow-sm transition-transform group-active:scale-95",
+                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border sm:h-14 sm:w-14 border-border bg-card text-primary shadow-sm transition-transform group-active:scale-95",
                     action.label === "Escanear" && "border-primary bg-primary text-primary-foreground",
                   )}
                 >
                   <action.icon className="h-6 w-6" aria-hidden="true" />
                 </span>
-                <span className="text-sm font-medium leading-tight text-foreground">{action.label}</span>
+                <span className="mt-1.5 w-full truncate text-xs font-medium leading-tight text-foreground sm:text-sm">{action.label}</span>
               </Link>
             </li>
           ))}
@@ -400,14 +400,14 @@ export function HomeOverview() {
       </nav>
 
       {/* ── Actividad reciente ── */}
-      <section aria-labelledby="activity-title" className="rounded-2xl border border-border bg-card">
-        <div className="flex items-center justify-between px-4 pt-4">
-          <h2 id="activity-title" className="text-base font-semibold text-foreground">
+      <section aria-labelledby="activity-title" className="w-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card">
+        <div className="flex w-full items-center justify-between gap-2 px-4 pt-4">
+          <h2 id="activity-title" className="min-w-0 truncate text-base font-semibold text-foreground">
             Actividad reciente
           </h2>
           <Link
             href="/dashboard/historial"
-            className="flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Ver todo <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Link>
@@ -441,9 +441,9 @@ export function HomeOverview() {
                 <li key={item.key}>
                   <Link
                     href={item.href}
-                    className="flex min-h-16 items-center gap-3 px-4 py-3 transition-colors hover:bg-secondary/60 focus-visible:bg-secondary focus-visible:outline-none"
+                    className="flex min-h-16 w-full min-w-0 items-center gap-3 px-4 py-3 transition-colors hover:bg-secondary/60 focus-visible:bg-secondary focus-visible:outline-none"
                   >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                       <Icon className="h-5 w-5" aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -451,11 +451,11 @@ export function HomeOverview() {
                       <span className="block truncate text-sm text-muted-foreground">
                         {item.subtitle} · {formatWhen(item.date)}
                       </span>
-                      <span className={cn("mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold", badge.className)}>
+                      <span className={cn("mt-1 inline-block max-w-full truncate rounded-full px-2 py-0.5 text-xs font-semibold", badge.className)}>
                         {badge.label}
                       </span>
                     </span>
-                    <span className="shrink-0 text-right text-base font-semibold tabular-nums text-foreground">
+                    <span className="shrink-0 whitespace-nowrap text-right text-sm font-semibold tabular-nums text-foreground sm:text-base">
                       {item.amount === null ? "—" : money(item.amount)}
                     </span>
                   </Link>

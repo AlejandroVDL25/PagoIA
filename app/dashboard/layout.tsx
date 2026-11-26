@@ -17,7 +17,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-dvh bg-background flex overflow-x-hidden">
+    <div className="min-h-dvh w-full max-w-full bg-background flex overflow-x-clip">
       {/* Desktop Sidebar */}
       <div className="hidden md:flex">
         <DashboardSidebar />
@@ -26,7 +26,7 @@ export default async function DashboardLayout({
       <div className="flex-1 flex flex-col min-w-0">
         <DashboardHeader user={user} />
         {/* En móvil se deja espacio para la barra inferior fija y el área segura del iPhone. */}
-        <main className="flex-1 p-4 sm:p-6 bg-background overflow-x-hidden pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-6">
+        <main className="flex-1 w-full min-w-0 max-w-full px-4 pt-4 sm:px-6 sm:pt-6 bg-background overflow-x-clip pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-6">
           {children}
         </main>
       </div>

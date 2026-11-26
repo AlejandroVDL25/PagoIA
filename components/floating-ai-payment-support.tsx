@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -32,6 +32,12 @@ const quickPrompts = [
 export function FloatingAIPaymentSupport() {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
+  const pathname = usePathname()
+  // En el panel móvil hay una barra inferior fija: el botón sube para no quedar detrás de ella.
+  const hasBottomNav = pathname?.startsWith("/dashboard") ?? false
+  const anchor = hasBottomNav
+    ? "bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6"
+    : "bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 sm:right-6"
   const [isMinimized, setIsMinimized] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -179,7 +185,7 @@ export function FloatingAIPaymentSupport() {
   // Botón cerrado - FUTURISTA
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 right-6 z-40">
+      <div className={`fixed z-40 ${anchor}`}>
         <style>{`
           @keyframes pulse-glow {
             0%, 100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.5), 0 0 40px rgba(59, 130, 246, 0.3); }
@@ -198,7 +204,7 @@ export function FloatingAIPaymentSupport() {
         `}</style>
         <button
           onClick={() => setIsOpen(true)}
-          className="bot-float bot-glow relative w-16 h-16 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 text-white shadow-2xl hover:shadow-2xl transform hover:scale-110 transition-all duration-300 flex items-center justify-center group border border-cyan-300/50 backdrop-blur-sm"
+          aria-label="Abrir chat de soporte" className="bot-float bot-glow relative w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 text-white shadow-2xl hover:shadow-2xl transform hover:scale-110 transition-all duration-300 flex items-center justify-center group border border-cyan-300/50 backdrop-blur-sm"
           title="Chat de soporte con IA"
         >
           <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-500/20 to-blue-500/20 blur-xl"></div>
@@ -212,7 +218,7 @@ export function FloatingAIPaymentSupport() {
   // Minimizado - FUTURISTA
   if (isMinimized) {
     return (
-      <div className="fixed bottom-6 right-6 z-40">
+      <div className={`fixed z-40 ${anchor}`}>
         <button
           onClick={() => setIsMinimized(false)}
           className="bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 text-white px-4 py-2 rounded-full shadow-xl hover:shadow-2xl transition-all flex items-center gap-2 font-semibold tracking-wide border border-cyan-300/50 backdrop-blur-sm hover:scale-105"
@@ -226,7 +232,7 @@ export function FloatingAIPaymentSupport() {
 
   // Chat abierto - ULTRA FUTURISTA
   return (
-    <div className="fixed bottom-6 right-6 z-40 w-full max-w-sm">
+    <div className={`fixed z-40 left-4 sm:left-auto sm:w-full sm:max-w-sm ${anchor}`}>
       <style>{`
         @keyframes gradient-shift {
           0% { background-position: 0% 50%; }

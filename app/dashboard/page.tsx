@@ -34,12 +34,13 @@ export default function DashboardPage() {
   }, [searchParams, toast, router])
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
+    <div className="mx-auto w-full min-w-0 max-w-6xl space-y-6">
       <h1 className="sr-only">Inicio</h1>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-start">
+      {/* grid-cols-1 = minmax(0,1fr): sin esto la columna crece al ancho del texto más largo y se desborda en móvil. */}
+      <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-start [&>*]:min-w-0">
         <HomeOverview />
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card className="border-border bg-card">
             <CardHeader className="pb-4">
               <CardTitle className="text-base text-foreground sm:text-lg">Pronóstico de gastos (IA)</CardTitle>
@@ -51,12 +52,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <SmartAlerts />
         <ServiceStatus />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid w-full grid-cols-1 gap-6 lg:grid-cols-2 [&>*]:min-w-0">
         <PaymentMethodSelector />
         <SpendingAnalysis />
       </div>

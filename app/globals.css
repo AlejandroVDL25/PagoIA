@@ -132,6 +132,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Ningún contenido puede generar scroll horizontal en el teléfono.
+     "clip" (y no "hidden") evita crear un contenedor de scroll, así el encabezado sticky sigue funcionando. */
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
   body {
     @apply bg-background text-foreground;
   }
