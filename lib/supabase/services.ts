@@ -371,18 +371,15 @@ export async function updateUserPreferences(preferences: Partial<UserPreferences
 
     // Tabla no existe - avisar pero no fallar
     if (error && error.message?.includes("Could not find the table")) {
-      console.log("Preferences saved locally (table not ready in database)")
       return null
     }
 
     // No tiene permisos - avisar pero no fallar
     if (error && (error.code === "PGRST301" || error.code === "42501")) {
-      console.log("Preferences saved locally (permissions pending)")
       return null
     }
 
     if (error) {
-      console.log("Preferences saved locally (database sync pending)")
       return null
     }
 

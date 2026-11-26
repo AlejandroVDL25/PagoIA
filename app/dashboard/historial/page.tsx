@@ -436,7 +436,30 @@ export default function HistorialPage() {
               <p className="text-muted-foreground">Cargando transacciones...</p>
             </div>
           ) : (
-          <div className="overflow-x-auto">
+          <>
+          {/* Móvil: lista de 3 zonas (estado, descripción, monto) en lugar de una tabla de 7 columnas. */}
+          <ul className="divide-y divide-border md:hidden">
+            {filteredTransactions.map((t) => (
+              <li key={t.id} className="flex min-h-16 w-full min-w-0 items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-medium text-foreground">{t.service}</p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {t.date} · {t.method}
+                  </p>
+                  <span className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded-full border px-2 py-0.5 text-xs font-semibold ${statusBadgeClass(t.status)}`}>
+                    {statusLabel(t.status)}
+                  </span>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="whitespace-nowrap text-base font-bold tabular-nums text-foreground">
+                    ${t.amount.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="whitespace-nowrap font-mono text-xs text-muted-foreground">#{t.id.slice(0, 8)}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
@@ -472,6 +495,7 @@ export default function HistorialPage() {
               </tbody>
             </table>
           </div>
+          </>
           )}
 
           {!loading && filteredTransactions.length === 0 && (

@@ -119,7 +119,7 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="relative min-h-dvh overflow-hidden bg-background flex items-center justify-center p-4">
         <div className="absolute top-20 right-1/4 w-64 h-64 bg-brand-spark/10 rounded-full blur-3xl" />
         <div className="absolute bottom-20 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         
@@ -143,7 +143,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="relative min-h-dvh overflow-hidden bg-background flex items-center justify-center p-4">
       {/* Background decorative elements */}
       <div className="absolute top-20 right-1/4 w-64 h-64 bg-brand-spark/10 rounded-full blur-3xl" />
       <div className="absolute bottom-20 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />

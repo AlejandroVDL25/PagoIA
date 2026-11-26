@@ -1,63 +1,47 @@
 "use client"
 
 import { useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertCircle, RefreshCcw, Home } from "lucide-react"
+import Link from "next/link"
+import { AlertCircle, Home, RefreshCcw } from "lucide-react"
 
-export default function DashboardError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string }
-  reset: () => void
-}) {
+/** Error dentro del panel: conserva la barra lateral y la barra inferior, y no muestra detalles técnicos. */
+export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    // Reportar a Sentry si está configurado
     if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
-      import("@sentry/nextjs").then(({ captureException }) => {
-        captureException(error)
-      })
+      void import("@sentry/nextjs").then(({ captureException }) => captureException(error))
     }
-    console.error("[DashboardError]", error)
+    console.error("[DashboardError]", error.digest ?? "", error)
   }, [error])
 
   return (
-    <div className="flex items-center justify-center min-h-[60vh] p-6">
-      <Card className="max-w-md w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-5 w-5" />
-            Error al cargar el dashboard
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-muted-foreground text-sm">
-            No se pudo cargar la información. Esto puede deberse a una conexión inestable
-            o un problema temporal.
-          </p>
-          {error.message && (
-            <p className="text-xs font-mono bg-muted rounded p-2 text-muted-foreground">
-              {error.message}
-            </p>
-          )}
-          <div className="flex gap-3">
-            <Button onClick={reset} className="flex-1" size="sm">
-              <RefreshCcw className="h-4 w-4 mr-2" />
-              Reintentar
-            </Button>
-            <Button
-              onClick={() => (window.location.href = "/dashboard")}
-              variant="outline"
-              className="flex-1"
-              size="sm"
-            >
-              <Home className="h-4 w-4 mr-2" />
-              Dashboard
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="flex min-h-[60vh] w-full items-center justify-center py-6">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 text-center shadow-sm" role="alert">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+          <AlertCircle className="h-7 w-7" aria-hidden="true" />
+        </div>
+        <h2 className="text-xl font-bold text-foreground">No se pudo cargar esta sección</h2>
+        <p className="mt-2 text-base text-muted-foreground">
+          Puede deberse a una conexión inestable o a un problema temporal. Tus datos están a salvo.
+        </p>
+        {error.digest && <p className="mt-2 text-sm text-muted-foreground">Código de referencia: {error.digest}</p>}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={reset}
+            className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <RefreshCcw className="h-5 w-5" aria-hidden="true" />
+            Reintentar
+          </button>
+          <Link
+            href="/dashboard"
+            className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-border px-4 text-base font-semibold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Home className="h-5 w-5" aria-hidden="true" />
+            Ir al inicio
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }

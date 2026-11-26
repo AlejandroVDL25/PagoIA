@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/drawer"
 import { createClient } from "@/lib/supabase/client"
 import { compressImage } from "@/lib/image-compress"
+import { useIsMobile } from "@/hooks/use-mobile"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -97,6 +99,7 @@ const toForm = (r: Receipt): Form => ({
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"]
 const MAX_PDF_MB = 10
+const REVIEW_TITLE = "Revisa lo que capturó la IA"
 
 const formatMoney = (n: number | null) =>
   n == null ? "—" : n.toLocaleString("es-MX", { style: "currency", currency: "MXN" })
@@ -107,6 +110,7 @@ export function ReceiptScanner() {
   const supabase = useMemo(() => createClient(), [])
   const { toast } = useToast()
   const { t } = useLocale()
+  const isMobile = useIsMobile()
   const fileInput = useRef<HTMLInputElement>(null)
   const cameraInput = useRef<HTMLInputElement>(null)
   const [consent, setConsent] = useState(false)
@@ -309,6 +313,68 @@ export function ReceiptScanner() {
     }
   }
 
+  // Hoja inferior en el teléfono y ventana centrada en computadora; el contenido es el mismo.
+  const reviewDescription = (
+    <>
+              {dudosos.length === 0
+                ? "Todos los campos se leyeron con claridad. Corrige lo que haga falta y confirma."
+                : `Revisa los ${dudosos.length} campos marcados en ámbar antes de confirmar.`}
+              {current?.service_number_last4 && ` Número de servicio terminación ${current.service_number_last4}.`}
+              {current?.confidence != null && ` Confianza de lectura: ${Math.round(current.confidence * 100)} %.`}
+            
+    </>
+  )
+  const reviewFields = (
+    <>
+          {form && current && (
+            <div className="overflow-y-auto px-4 pb-2 md:px-0">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {field("provider", "Proveedor")}
+                <div className="space-y-1.5">
+                  <Label htmlFor="rc-service">Servicio</Label>
+                  <Select value={form.service_type} onValueChange={(v) => setForm((f) => (f ? { ...f, service_type: v } : f))}>
+                    <SelectTrigger
+                      id="rc-service"
+                      className={cn("h-12 w-full text-base", dudosos.includes("tipo_servicio") && "border-amber-500 ring-2 ring-amber-500/30")}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(SERVICE_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value} className="min-h-11 text-base">
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {field("amount", "Total a pagar (MXN)", "number")}
+                {field("due_date", "Fecha límite de pago", "date")}
+                {field("period_start", "Inicio del periodo", "date")}
+                {field("period_end", "Fin del periodo", "date")}
+                {field("consumption", `Consumo${current.consumption_unit ? ` (${current.consumption_unit})` : ""}`, "number")}
+              </div>
+            </div>
+          )}
+    </>
+  )
+  const reviewActions = (
+    <>
+            <Button disabled={stage === "saving"} onClick={() => review("confirm")} className="h-12 text-base md:order-2">
+              {stage === "saving" ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
+              ) : (
+                <CheckCircle2 className="mr-2 h-5 w-5" aria-hidden="true" />
+              )}
+              Confirmar y crear pago
+            </Button>
+            <Button variant="outline" disabled={stage === "saving"} onClick={() => review("reject")} className="h-12 text-base md:order-1">
+              Descartar
+            </Button>
+          
+    </>
+  )
+
   return (
     <div className="space-y-6">
       <Card>
@@ -381,63 +447,29 @@ export function ReceiptScanner() {
         </CardContent>
       </Card>
 
-      <Drawer open={reviewOpen} onOpenChange={closeReview}>
-        <DrawerContent className="mx-auto w-full max-w-2xl data-[vaul-drawer-direction=bottom]:max-h-[92dvh]">
-          <DrawerHeader className="text-left">
-            <DrawerTitle className="text-lg">Revisa lo que capturó la IA</DrawerTitle>
-            <DrawerDescription>
-              {dudosos.length === 0
-                ? "Todos los campos se leyeron con claridad. Corrige lo que haga falta y confirma."
-                : `Revisa los ${dudosos.length} campos marcados en ámbar antes de confirmar.`}
-              {current?.service_number_last4 && ` Número de servicio terminación ${current.service_number_last4}.`}
-              {current?.confidence != null && ` Confianza de lectura: ${Math.round(current.confidence * 100)} %.`}
-            </DrawerDescription>
-          </DrawerHeader>
-          {form && current && (
-            <div className="overflow-y-auto px-4 pb-2">
-              <div className="grid gap-4 sm:grid-cols-2">
-                {field("provider", "Proveedor")}
-                <div className="space-y-1.5">
-                  <Label htmlFor="rc-service">Servicio</Label>
-                  <Select value={form.service_type} onValueChange={(v) => setForm((f) => (f ? { ...f, service_type: v } : f))}>
-                    <SelectTrigger
-                      id="rc-service"
-                      className={cn("h-12 w-full text-base", dudosos.includes("tipo_servicio") && "border-amber-500 ring-2 ring-amber-500/30")}
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(SERVICE_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value} className="min-h-11 text-base">
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {field("amount", "Total a pagar (MXN)", "number")}
-                {field("due_date", "Fecha límite de pago", "date")}
-                {field("period_start", "Inicio del periodo", "date")}
-                {field("period_end", "Fin del periodo", "date")}
-                {field("consumption", `Consumo${current.consumption_unit ? ` (${current.consumption_unit})` : ""}`, "number")}
-              </div>
-            </div>
-          )}
-          <DrawerFooter className="pb-[calc(1rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end">
-            <Button disabled={stage === "saving"} onClick={() => review("confirm")} className="h-12 text-base sm:order-2">
-              {stage === "saving" ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" aria-hidden="true" />
-              ) : (
-                <CheckCircle2 className="mr-2 h-5 w-5" aria-hidden="true" />
-              )}
-              Confirmar y crear pago
-            </Button>
-            <Button variant="outline" disabled={stage === "saving"} onClick={() => review("reject")} className="h-12 text-base sm:order-1">
-              Descartar
-            </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
+      {isMobile ? (
+        <Drawer open={reviewOpen} onOpenChange={closeReview}>
+          <DrawerContent className="mx-auto w-full data-[vaul-drawer-direction=bottom]:max-h-[92dvh]">
+            <DrawerHeader className="text-left">
+              <DrawerTitle className="text-lg">{REVIEW_TITLE}</DrawerTitle>
+              <DrawerDescription>{reviewDescription}</DrawerDescription>
+            </DrawerHeader>
+            {reviewFields}
+            <DrawerFooter className="pb-[calc(1rem+env(safe-area-inset-bottom))]">{reviewActions}</DrawerFooter>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={reviewOpen} onOpenChange={closeReview}>
+          <DialogContent className="flex max-h-[90dvh] w-full flex-col gap-4 sm:max-w-2xl">
+            <DialogHeader className="text-left">
+              <DialogTitle className="text-lg">{REVIEW_TITLE}</DialogTitle>
+              <DialogDescription>{reviewDescription}</DialogDescription>
+            </DialogHeader>
+            {reviewFields}
+            <DialogFooter className="gap-3 sm:justify-end">{reviewActions}</DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Card>
         <CardHeader>

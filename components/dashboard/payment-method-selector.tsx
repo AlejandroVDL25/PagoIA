@@ -52,7 +52,6 @@ export function PaymentMethodSelector() {
       }
 
       setLoading(true)
-      console.log(`[PaymentSelector] Creating payment: service=${selectedService}, amount=${amount}`)
 
       const requestBody = {
         amount: amount,
@@ -62,7 +61,6 @@ export function PaymentMethodSelector() {
         serviceType: selectedService,
       }
       
-      console.log("[PaymentSelector] Request payload:", JSON.stringify(requestBody, null, 2))
 
       const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
@@ -70,7 +68,6 @@ export function PaymentMethodSelector() {
         body: JSON.stringify(requestBody),
       })
 
-      console.log(`[PaymentSelector] Response status: ${response.status}, statusText: "${response.statusText}"`)
 
       if (!response.ok) {
         let errorData: Record<string, any> = { error: `HTTP ${response.status}: ${response.statusText}` }
@@ -78,7 +75,6 @@ export function PaymentMethodSelector() {
 
         try {
           responseText = await response.text()
-          console.log("[PaymentSelector] Raw response text:", responseText.substring(0, 500))
           
           if (responseText.trim()) {
             try {
@@ -133,10 +129,8 @@ export function PaymentMethodSelector() {
       }
 
       const data = await response.json()
-      console.log("[PaymentSelector] Payment created successfully:", data)
 
       if (data.url) {
-        console.log("[PaymentSelector] Redirecting to Stripe checkout:", data.url)
         window.location.href = data.url
       } else {
         throw new Error("No checkout URL provided by Stripe API")

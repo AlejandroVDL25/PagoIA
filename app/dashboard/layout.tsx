@@ -27,7 +27,8 @@ export default async function DashboardLayout({
         <DashboardHeader user={user} />
         {/* En móvil se deja espacio para la barra inferior fija y el área segura del iPhone. */}
         <main className="flex-1 w-full min-w-0 max-w-full px-4 pt-4 sm:px-6 sm:pt-6 bg-background overflow-x-clip pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-6">
-          {children}
+          {/* En monitores grandes el contenido no se estira de lado a lado. */}
+          <div className="mx-auto w-full min-w-0 max-w-7xl">{children}</div>
         </main>
       </div>
 

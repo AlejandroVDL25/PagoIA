@@ -241,19 +241,19 @@ export default function PerfilPage() {
       {/* Avatar Card */}
       <Card className="bg-card border-border">
         <CardContent className="pt-6">
-          <div className="flex items-center gap-6">
-            <Avatar className="h-24 w-24 border-2 border-primary">
+          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-6 sm:text-left">
+            <Avatar className="h-20 w-20 shrink-0 border-2 border-primary sm:h-24 sm:w-24">
               <AvatarImage src={user.user_metadata?.avatar_url} alt={user.email || ""} />
               <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
                 {userInitials}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-foreground">
+            <div className="w-full min-w-0 flex-1">
+              <h2 className="truncate text-2xl font-bold text-foreground">
                 {user.user_metadata?.full_name || "Usuario"}
               </h2>
-              <p className="text-muted-foreground">{user.email}</p>
-              <div className="flex items-center gap-2 mt-2">
+              <p className="truncate text-muted-foreground">{user.email}</p>
+              <div className="mt-2 flex items-center justify-center gap-2 sm:justify-start">
                 <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">
                   ✓ Verificado
                 </Badge>
@@ -262,7 +262,7 @@ export default function PerfilPage() {
             {!editing && (
               <Button 
                 onClick={() => setEditing(true)}
-                className="bg-primary hover:bg-primary/90"
+                className="h-11 w-full shrink-0 bg-primary hover:bg-primary/90 sm:w-auto"
               >
                 Editar Perfil
               </Button>

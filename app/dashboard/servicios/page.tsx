@@ -289,19 +289,21 @@ export default function MisServiciosPage() {
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground">Mis Servicios</h1>
           <p className="text-sm sm:text-base text-muted-foreground mt-1">Gestiona tus servicios y pagos vinculados</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex w-full min-w-0 gap-2 sm:w-auto">
           <Button
             variant="outline"
             size="icon"
-            className="border-border/50 hover:bg-secondary/70"
+            className="h-11 w-11 shrink-0 border-border/50 hover:bg-secondary/70"
             onClick={loadServices}
             disabled={loadingServices}
             title="Actualizar servicios"
+            aria-label="Actualizar servicios"
           >
-            <RefreshCw className={`w-4 h-4 ${loadingServices ? "animate-spin" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${loadingServices ? "animate-spin" : ""}`} aria-hidden="true" />
           </Button>
+          {/* flex-1 (no w-full): w-full + el botón de actualizar sumaban más que el ancho de la pantalla. */}
           <Button
-            className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full w-full sm:w-auto"
+            className="h-11 min-w-0 flex-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full sm:flex-none"
             onClick={() => setAddDialogOpen(true)}
           >
             <Plus className="mr-2 h-4 w-4" />

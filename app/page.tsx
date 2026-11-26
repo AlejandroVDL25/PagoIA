@@ -46,8 +46,8 @@ export default function HomePage() {
     <div className="landing-3d dark min-h-screen text-foreground">
       <div className="landing-atmosphere" aria-hidden="true" />
       {/* Navigation */}
-      <nav className="landing-nav sticky top-0 z-50 flex items-center justify-between px-6 py-4 md:px-8">
-        <div className="flex items-center gap-8">
+      <nav className="landing-nav sticky top-0 z-50 flex items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4 md:px-8">
+        <div className="flex min-w-0 items-center gap-8">
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-all duration-300">
             <Logo animated markClassName="h-10 w-10" />
           </Link>
@@ -66,11 +66,11 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" className="text-foreground hover:text-cyan-400 hover:bg-cyan-400/10 rounded-lg">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+          <Button asChild variant="ghost" className="h-11 rounded-lg px-3 text-foreground hover:bg-cyan-400/10 hover:text-cyan-400 sm:px-4">
             <Link href="/auth/login">Ingresar</Link>
           </Button>
-          <Button asChild className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-lg px-6 font-semibold">
+          <Button asChild className="h-11 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 font-semibold text-white hover:from-cyan-600 hover:to-blue-600 sm:px-6">
             <Link href="/auth/register">Comenzar</Link>
           </Button>
         </div>

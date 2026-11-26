@@ -56,7 +56,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  console.log(`Processing webhook event: ${event.type}`)
 
   try {
     // Pagos por tarjeta completados
@@ -172,7 +171,6 @@ async function handleCheckoutSessionCompleted(event: Stripe.Event, stripe: Strip
       tag: `payment-completed-${session.id}`,
     })
 
-    console.log(`Payment completed for user ${userId}: ${serviceName} (${provider}) - $${amount} MXN`)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error("Error processing checkout completion:", errorMessage)
@@ -241,7 +239,6 @@ async function handleChargeDispute(event: Stripe.Event, stripe: Stripe) {
       tag: `dispute-${dispute.id}`,
     })
 
-    console.log(`Dispute created for user ${userId}: ${dispute.id}`)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error("Error processing dispute:", errorMessage)

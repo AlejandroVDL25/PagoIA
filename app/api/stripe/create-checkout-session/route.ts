@@ -14,11 +14,9 @@ const PAYMENT_METHODS = (process.env.STRIPE_PAYMENT_METHODS || "card")
 
 export async function POST(req: NextRequest) {
   try {
-    console.log("[API] POST /api/stripe/create-checkout-session - Starting")
     
     const { amount, service, serviceId, provider, serviceType } = await req.json()
 
-    console.log(`[API] Payment request: service=${service}, provider=${provider}, amount=${amount}`)
 
     if (!amount || !service || !serviceId) {
       console.warn("[API] Missing required fields")
@@ -39,7 +37,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log(`[API] Processing card payment for user: ${user.id}`)
 
     // success_url / cancel_url siempre apuntan al dominio público (https://pagoia.vercel.app en producción).
     const resolvedBaseUrl = resolveBaseUrl(req)
@@ -76,7 +73,6 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    console.log(`[API] Checkout session created: ${session.id}`)
 
     return NextResponse.json({
       sessionId: session.id,

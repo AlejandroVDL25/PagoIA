@@ -95,7 +95,6 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    console.log("[API] POST /api/payments/status - Starting")
     
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -108,7 +107,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log(`[API] Fetching payments for user: ${user.id}`)
 
     // Obtener todos los pagos pendientes del usuario
     const { data: pendingPayments, error: dbError } = await supabase
@@ -122,7 +120,6 @@ export async function POST(req: NextRequest) {
       console.warn("[API] Database query error:", dbError.message)
       // Si la tabla no existe aún, retornar lista vacía
       if (dbError.code === "42P01") {
-        console.log("[API] Table pending_payments does not exist yet")
         return NextResponse.json({ count: 0, payments: [] })
       }
       return NextResponse.json(
@@ -131,7 +128,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log(`[API] Found ${pendingPayments?.length || 0} pending payments`)
 
     // Si no hay pagos, retornar json vacío
     if (!pendingPayments || pendingPayments.length === 0) {
@@ -179,7 +175,6 @@ export async function POST(req: NextRequest) {
     // Filtrar nulls (no debería haber, pero por seguridad)
     const validPayments = enrichedPayments.filter(Boolean)
 
-    console.log(`[API] Returning ${validPayments.length} payments`)
     return NextResponse.json({
       count: validPayments.length,
       payments: validPayments,
