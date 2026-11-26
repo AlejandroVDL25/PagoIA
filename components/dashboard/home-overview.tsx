@@ -23,6 +23,7 @@ import {
 import { createClient } from "@/lib/supabase/client"
 import { daysUntil, nextDueDate, parseDueDay } from "@/lib/due-dates"
 import { formatMXN, serviceLabel } from "@/lib/services-meta"
+import { isAbortedRequest } from "@/lib/is-aborted-request"
 import { cn } from "@/lib/utils"
 
 const HIDE_AMOUNTS_KEY = "pagoia-hide-amounts-v1"
@@ -227,7 +228,7 @@ export function HomeOverview() {
     })
   }
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (attempt = 0): Promise<void> => {
     try {
       const {
         data: { user },
@@ -277,7 +278,13 @@ export function HomeOverview() {
       )
       setError(null)
     } catch (e) {
-      console.error("[HomeOverview]", e)
+      // Con la sesión abierta en varias pestañas, Supabase puede interrumpir una lectura (AbortError
+      // "Lock broken"); no es una falla real: se reintenta una vez antes de avisar.
+      if (isAbortedRequest(e) && attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 400))
+        return load(1)
+      }
+      if (!isAbortedRequest(e)) console.error("[HomeOverview]", e)
       setError("No pudimos actualizar tu resumen. Revisa tu conexión.")
     } finally {
       setLoading(false)

@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { createClient, isSupabaseClientConfigured } from "@/lib/supabase/client"
 import { getUserPreferences } from "@/lib/supabase/services"
+import { isAbortedRequest } from "@/lib/is-aborted-request"
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4)
@@ -62,7 +63,13 @@ export function PushNotificationsManager() {
       }
     }
 
+    // La sincronización se dispara al cargar y otra vez con el evento INITIAL_SESSION de Supabase.
+    // Si corren a la vez compiten por el candado de la sesión ("Lock broken"), así que no se solapan.
+    let syncing = false
+
     async function syncPushSubscription() {
+      if (syncing) return
+      syncing = true
       try {
         const {
           data: { user },
@@ -120,7 +127,9 @@ export function PushNotificationsManager() {
           }),
         })
       } catch (error) {
-        console.error("Push registration error:", error)
+        if (!isAbortedRequest(error)) console.error("Push registration error:", error)
+      } finally {
+        syncing = false
       }
     }
 
