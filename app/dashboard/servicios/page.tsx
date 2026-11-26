@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useSearchParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { PaymentSuccess } from "@/components/dashboard/payment-success"
+import { dueDateInMonth } from "@/lib/due-dates"
 
 interface ServiceItem {
   dbId: string | null
@@ -43,19 +44,37 @@ const serviceNameMap: Record<string, string> = {
   insurance: "Seguros",
 }
 
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+
+/**
+ * Estado del recibo del periodo actual a partir del día de vencimiento y del último pago.
+ * - Pagado después del vencimiento anterior → el recibo de este periodo está "Pagada".
+ * - Sin pago y ya pasó el vencimiento → "Vencida".
+ * - Si ya se pagó y el vencimiento de este mes pasó, se muestra el siguiente recibo como "Próxima".
+ * Los registros viejos con status "paid" y sin last_paid_at se respetan como "Pagada".
+ */
+function serviceCycle(dueDayOfMonth: number, status: string, lastPaidAt: string | null, today = new Date()): { status: string; due: Date } {
+  const t = startOfDay(today)
+  const thisDue = dueDateInMonth(dueDayOfMonth, t.getFullYear(), t.getMonth())
+  const prevDue = dueDateInMonth(dueDayOfMonth, t.getFullYear(), t.getMonth() - 1)
+  const nextDue = dueDateInMonth(dueDayOfMonth, t.getFullYear(), t.getMonth() + 1)
+  const paidAt = lastPaidAt ? new Date(lastPaidAt) : null
+  const paidThisCycle = paidAt ? paidAt > prevDue : status === "paid"
+
+  if (t <= thisDue) return { status: paidThisCycle ? "Pagada" : "Próxima", due: thisDue }
+  return paidThisCycle ? { status: "Próxima", due: nextDue } : { status: "Vencida", due: thisDue }
+}
+
+function formatDate(d: Date): string {
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+}
+
 function computeStatus(dueDayOfMonth: number): string {
-  const today = new Date()
-  const dueDate = new Date(today.getFullYear(), today.getMonth(), dueDayOfMonth)
-  const diff = (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  if (diff < 0) return "Vencida"
-  if (diff <= 5) return "Próxima"
-  return "Próxima"
+  return serviceCycle(dueDayOfMonth, "active", null).status
 }
 
 function formatDueDate(dueDayOfMonth: number): string {
-  const today = new Date()
-  const d = new Date(today.getFullYear(), today.getMonth(), dueDayOfMonth)
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+  return formatDate(serviceCycle(dueDayOfMonth, "active", null).due)
 }
 
 function parseDayFromString(dateStr: string): number {
@@ -93,16 +112,28 @@ export default function MisServiciosPage() {
       if (error) throw error
 
       if (data && data.length > 0) {
-        const mapped: ServiceItem[] = data.map((row: { id: string; service_type: string; provider: string; last_amount: number | null; due_date: number | null; status: string }) => ({
-          dbId: row.id,
-          icon: serviceIconMap[row.service_type] ?? Zap,
-          name: serviceNameMap[row.service_type] ?? row.service_type,
-          id: row.service_type + "-" + row.id,
-          company: row.provider,
-          amount: row.last_amount ?? 0,
-          dueDate: row.due_date ? formatDueDate(row.due_date) : "—",
-          status: row.status === "paid" ? "Pagada" : (row.due_date ? computeStatus(row.due_date) : "Próxima"),
-        }))
+        type ServiceRow = {
+          id: string
+          service_type: string
+          provider: string
+          last_amount: number | string | null
+          due_date: number | null
+          status: string
+          last_paid_at?: string | null
+        }
+        const mapped: ServiceItem[] = (data as ServiceRow[]).map((row) => {
+          const cycle = row.due_date ? serviceCycle(row.due_date, row.status, row.last_paid_at ?? null) : null
+          return {
+            dbId: row.id,
+            icon: serviceIconMap[row.service_type] ?? Zap,
+            name: serviceNameMap[row.service_type] ?? row.service_type,
+            id: row.service_type + "-" + row.id,
+            company: row.provider,
+            amount: Number(row.last_amount ?? 0),
+            dueDate: cycle ? formatDate(cycle.due) : "—",
+            status: cycle ? cycle.status : row.status === "paid" ? "Pagada" : "Próxima",
+          }
+        })
         setServices(mapped)
       } else {
         // Sin servicios guardados: se muestra el estado vacío, nunca montos inventados que se puedan cobrar.
@@ -131,26 +162,41 @@ export default function MisServiciosPage() {
         ? `Pago de ${service} — ${provider} procesado exitosamente.`
         : `Pago de ${service || "servicio"} procesado exitosamente.`
       const sessionId = searchParams.get("session_id")
-      const showResult = (paymentStatus?: string) => {
+      const showResult = (paymentStatus?: string, recorded?: boolean) => {
         if (paymentStatus === "unpaid") {
           toast({
             title: "Ficha OXXO generada",
             description: "Págala en cualquier OXXO en los próximos 3 días. Te avisaremos cuando se confirme.",
             duration: 8000,
           })
-        } else {
-          setPaymentSuccess(desc)
+          return
+        }
+        setPaymentSuccess(desc)
+        if (recorded === false) {
+          toast({
+            title: "Pago recibido",
+            description: "Stripe confirmó tu pago; lo verás en tu historial en unos segundos.",
+            duration: 6000,
+          })
         }
       }
-      if (sessionId) {
-        fetch(`/api/stripe/session-status?session_id=${encodeURIComponent(sessionId)}`)
-          .then((r) => (r.ok ? r.json() : null))
-          .then((data) => showResult(data?.paymentStatus))
-          .catch(() => showResult())
-      } else {
-        showResult()
+      // Primero se registra el pago (si el webhook aún no llegó) y después se recargan los servicios,
+      // para que el estado "Pagada" y los totales aparezcan sin recargar la página.
+      const sync = async () => {
+        if (!sessionId) {
+          showResult()
+          return
+        }
+        try {
+          const res = await fetch(`/api/stripe/session-status?session_id=${encodeURIComponent(sessionId)}`, { cache: "no-store" })
+          const data: unknown = res.ok ? await res.json() : null
+          const info = typeof data === "object" && data !== null ? (data as { paymentStatus?: string; recorded?: boolean }) : {}
+          showResult(info.paymentStatus, info.recorded)
+        } catch {
+          showResult()
+        }
       }
-      loadServices() // Recargar para reflejar estado actualizado
+      void sync().finally(() => loadServices())
       // Limpiar query params sin recargar la página
       router.replace("/dashboard/servicios", { scroll: false })
     } else if (payment === "cancelled") {

@@ -3,244 +3,112 @@ import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { createAlertAndPush } from "@/lib/notifications/push"
 import { saveCardFromSetupSession } from "@/lib/payments/autopay-stripe"
+import { failCheckoutSession, syncCheckoutSession } from "@/lib/payments/checkout-sync"
+
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 function getWebhookRuntime() {
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY?.trim()
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim()
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRoleKey =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 
-  if (!stripeSecretKey || !webhookSecret) {
-    return {
-      error: "Stripe webhook no configurado todavía.",
-    } as const
-  }
+  if (!stripeSecretKey || !webhookSecret) return { error: "Stripe webhook no configurado." } as const
+  if (!supabaseUrl || !serviceRoleKey) return { error: "Supabase admin no configurado." } as const
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    return {
-      error: "Supabase admin no configurado todavía.",
-    } as const
-  }
-
-  return {
-    stripe: new Stripe(stripeSecretKey),
-    webhookSecret,
-  } as const
+  return { stripe: new Stripe(stripeSecretKey), webhookSecret } as const
 }
 
+/**
+ * Webhook de Stripe. La firma HMAC-SHA256 se valida sobre el cuerpo crudo (req.text()).
+ * Si algo falla al guardar se responde 500 para que Stripe reintente; el registro es
+ * idempotente, así que un reintento nunca duplica el pago.
+ */
 export async function POST(req: NextRequest) {
-  const runtime = getWebhookRuntime()
-
-  if ("error" in runtime) {
-    return NextResponse.json({ error: runtime.error }, { status: 503 })
+  const rt = getWebhookRuntime()
+  if ("error" in rt) {
+    console.error("[stripe/webhook]", rt.error)
+    return NextResponse.json({ error: rt.error }, { status: 503 })
   }
 
-  const body = await req.text()
-  const signature = req.headers.get("stripe-signature") || ""
+  const rawBody = await req.text()
+  const signature = req.headers.get("stripe-signature")
+  if (!signature) return NextResponse.json({ error: "Falta la firma stripe-signature" }, { status: 400 })
 
   let event: Stripe.Event
-
   try {
-    event = runtime.stripe.webhooks.constructEvent(
-      body,
-      signature,
-      runtime.webhookSecret
-    )
+    event = rt.stripe.webhooks.constructEvent(rawBody, signature, rt.webhookSecret)
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error("Webhook signature verification failed:", errorMessage)
-    return NextResponse.json(
-      { error: `Webhook Error: ${errorMessage}` },
-      { status: 400 }
-    )
+    const message = error instanceof Error ? error.message : String(error)
+    console.error("[stripe/webhook] firma inválida:", message)
+    return NextResponse.json({ error: `Firma inválida: ${message}` }, { status: 400 })
   }
 
-
   try {
-    // Pagos por tarjeta completados
-    if (event.type === "checkout.session.completed") {
-      await handleCheckoutSessionCompleted(event, runtime.stripe)
-    }
-
-    // OXXO: la ficha se paga después; Stripe avisa si se pagó o si venció.
-    if (event.type === "checkout.session.async_payment_succeeded") {
-      await handleAsyncPayment(event, true)
-    }
-    if (event.type === "checkout.session.async_payment_failed") {
-      await handleAsyncPayment(event, false)
-    }
-
-    // Chargebacks/Disputas
-    if (event.type === "charge.dispute.created") {
-      await handleChargeDispute(event, runtime.stripe)
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object
+        if (session.mode === "setup") {
+          await saveCardFromSetupSession(rt.stripe, createAdminClient(), session)
+          break
+        }
+        const result = await syncCheckoutSession(createAdminClient(), session)
+        if (!result.recorded) console.warn(`[stripe/webhook] ${event.id} no registrado: ${result.reason}`)
+        break
+      }
+      // OXXO: la ficha se paga (o vence) días después de completar la sesión.
+      case "checkout.session.async_payment_succeeded": {
+        await syncCheckoutSession(createAdminClient(), event.data.object)
+        break
+      }
+      case "checkout.session.async_payment_failed": {
+        await failCheckoutSession(createAdminClient(), event.data.object)
+        break
+      }
+      case "charge.dispute.created": {
+        await handleChargeDispute(event.data.object, rt.stripe)
+        break
+      }
+      default:
+        break
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error("Error processing webhook:", errorMessage)
-    // No retornar error para evitar reintentos infinitos de Stripe
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`[stripe/webhook] ${event.type} ${event.id}:`, message)
+    // 500 → Stripe reintenta con backoff hasta 3 días. Antes se respondía 200 y el pago se perdía.
+    return NextResponse.json({ error: "No se pudo registrar el evento" }, { status: 500 })
   }
 
   return NextResponse.json({ received: true })
 }
 
-/**
- * Maneja finalización de sesión de checkout (pagos por tarjeta)
- */
-async function handleCheckoutSessionCompleted(event: Stripe.Event, stripe: Stripe) {
-  const session = event.data.object as Stripe.Checkout.Session
-
-  // Tarjeta guardada para pagos automáticos: no hay cobro que registrar.
-  if (session.mode === "setup") {
-    await saveCardFromSetupSession(stripe, createAdminClient(), session)
+/** Disputa (contracargo): se avisa al dueño del pago. */
+async function handleChargeDispute(dispute: Stripe.Dispute, stripe: Stripe) {
+  const chargeId = typeof dispute.charge === "string" ? dispute.charge : dispute.charge.id
+  const charge = await stripe.charges.retrieve(chargeId)
+  let userId: string | null = charge.metadata?.userId ?? null
+  if (!userId && typeof charge.payment_intent === "string") {
+    const sessions = await stripe.checkout.sessions.list({ payment_intent: charge.payment_intent, limit: 1 })
+    const session = sessions.data[0]
+    userId = session?.client_reference_id ?? session?.metadata?.userId ?? null
+  }
+  if (!userId) {
+    console.warn(`[stripe/webhook] disputa ${dispute.id} sin usuario`)
     return
   }
-
   try {
-    const supabase = createAdminClient()
-
-    const userId = session.metadata?.userId
-    const serviceId = session.metadata?.serviceId
-    const serviceType = session.metadata?.serviceType || serviceId
-    const serviceName = session.metadata?.service
-    const provider = session.metadata?.provider || "Stripe"
-    const amount = parseFloat(session.metadata?.amount || "0")
-
-    if (!userId) {
-      console.error("User ID not found in session metadata")
-      return
-    }
-
-    // Con OXXO la sesión se completa al generar la ficha, pero el pago llega después.
-    // receipt_number guarda el id de la sesión para cerrar la transacción en handleAsyncPayment.
-    if (session.payment_status === "unpaid") {
-      const { error: pendingError } = await supabase.from("transactions").insert({
-        user_id: userId,
-        service_type: serviceType,
-        amount: amount,
-        status: "pending",
-        provider: provider,
-        receipt_number: session.id,
-        transaction_date: new Date().toISOString(),
-      })
-      if (pendingError) console.error("Pending OXXO transaction insert error:", pendingError)
-      await createAlertAndPush({
-        userId,
-        title: `Ficha OXXO lista: ${serviceName}`,
-        message: `Paga $${amount.toFixed(2)} MXN en cualquier OXXO en los próximos 3 días. Te avisaremos cuando se confirme el pago.`,
-        alertType: "warning",
-        url: "/dashboard/historial",
-        tag: `oxxo-voucher-${session.id}`,
-      })
-      return
-    }
-
-    // Registrar transacción completada con el proveedor real
-    const { error: txError } = await supabase
-      .from("transactions")
-      .insert({
-        user_id: userId,
-        service_type: serviceType,
-        amount: amount,
-        status: "completed",
-        provider: provider,
-        receipt_number: session.id,
-        transaction_date: new Date().toISOString(),
-      })
-
-    if (txError) {
-      console.error("Transaction insert error:", txError)
-      return
-    }
-
-    // Marcar el servicio como pagado en user_services (si existe en DB)
-    if (serviceId && !serviceId.includes("-default")) {
-      await supabase
-        .from("user_services")
-        .update({ status: "paid" })
-        .eq("id", serviceId)
-        .eq("user_id", userId)
-    }
-
     await createAlertAndPush({
       userId,
-      title: `✅ Pago de ${serviceName} completado`,
-      message: `Se procesó un pago de $${amount.toFixed(2)} MXN a ${provider}. Transacción: ${session.id.slice(-8).toUpperCase()}. Descarga tu comprobante desde Historial.`,
-      alertType: "success",
-      url: `/dashboard/servicios?payment=success&service=${encodeURIComponent(serviceName ?? serviceId ?? "")}`,
-      tag: `payment-completed-${session.id}`,
-    })
-
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error("Error processing checkout completion:", errorMessage)
-  }
-}
-
-/**
- * Resultado de un pago asíncrono (ficha OXXO pagada o vencida).
- */
-async function handleAsyncPayment(event: Stripe.Event, succeeded: boolean) {
-  const session = event.data.object as Stripe.Checkout.Session
-  const userId = session.metadata?.userId
-  if (!userId) return
-
-  const supabase = createAdminClient()
-  const serviceId = session.metadata?.serviceId
-  const serviceName = session.metadata?.service ?? "tu servicio"
-  const amount = parseFloat(session.metadata?.amount || "0")
-
-  await supabase
-    .from("transactions")
-    .update({ status: succeeded ? "completed" : "failed" })
-    .eq("receipt_number", session.id)
-    .eq("user_id", userId)
-
-  if (succeeded && serviceId && !serviceId.includes("-default")) {
-    await supabase.from("user_services").update({ status: "paid" }).eq("id", serviceId).eq("user_id", userId)
-  }
-
-  await createAlertAndPush({
-    userId,
-    title: succeeded ? `✅ Pago de ${serviceName} confirmado` : `La ficha OXXO de ${serviceName} venció`,
-    message: succeeded
-      ? `OXXO confirmó tu pago de $${amount.toFixed(2)} MXN. Descarga tu comprobante desde Historial.`
-      : `No se registró el pago de $${amount.toFixed(2)} MXN. Puedes generar una ficha nueva desde Mis Pagos.`,
-    alertType: succeeded ? "success" : "error",
-    url: succeeded ? "/dashboard/historial" : "/dashboard/servicios",
-    tag: `oxxo-${succeeded ? "paid" : "expired"}-${session.id}`,
-  })
-}
-
-/**
- * Maneja disputas/chargebacks (cliente disputa el cargo)
- */
-async function handleChargeDispute(event: Stripe.Event, stripe: Stripe) {
-  const dispute = event.data.object as Stripe.Dispute
-
-  try {
-    const supabase = createAdminClient()
-
-    // Obtener información del charge
-    const charge = await stripe.charges.retrieve(dispute.charge as string)
-    const userId = charge.metadata?.userId
-
-    if (!userId) {
-      console.error("User ID not found in charge metadata")
-      return
-    }
-
-    await createAlertAndPush({
-      userId,
+      supabaseClient: createAdminClient(),
       title: "Disputa de pago",
-      message: `Se ha reportado una disputa para el cargo ${dispute.charge}. El monto en disputa es $${(dispute.amount / 100).toFixed(2)} MXN. Revisaremos el caso dentro de 7-10 días hábiles.`,
+      message: `Se reportó una disputa por $${(dispute.amount / 100).toFixed(2)} MXN. La revisaremos en 7 a 10 días hábiles.`,
       alertType: "error",
       url: "/dashboard/notificaciones",
       tag: `dispute-${dispute.id}`,
+      source: `dispute:${dispute.id}`,
     })
-
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error("Error processing dispute:", errorMessage)
+    console.error("[stripe/webhook] aviso de disputa:", error instanceof Error ? error.message : error)
   }
 }
