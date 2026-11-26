@@ -7,6 +7,7 @@ import { FloatingAIPaymentSupport } from '@/components/floating-ai-payment-suppo
 import { PushNotificationsManager } from '@/components/push-notifications-manager'
 import { Toaster } from '@/components/ui/toaster'
 import { LocaleProvider } from '@/components/i18n/locale-provider'
+import { getBaseUrl } from '@/lib/app-url'
 import './globals.css'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
@@ -24,10 +25,22 @@ export const viewport: Viewport = {
   ],
 }
 
+const googleVerification = process.env.GOOGLE_SITE_VERIFICATION?.trim()
+
 export const metadata: Metadata = {
+  metadataBase: new URL(getBaseUrl()),
   title: 'PagoIA - Gestión de Pagos con IA',
   description: 'Simplifica y automatiza tus pagos de servicios con inteligencia artificial',
-  generator: 'v0.app',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    locale: 'es_MX',
+    siteName: 'PagoIA',
+    title: 'PagoIA - Gestión de Pagos con IA',
+    description: 'Paga tu luz, agua, gas e internet, escanea tus recibos con IA y recibe recordatorios antes de que venzan.',
+  },
+  // Código de Google Search Console (método "Etiqueta HTML"). Se configura en Vercel, sin tocar el código.
+  ...(googleVerification ? { verification: { google: googleVerification } } : {}),
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
